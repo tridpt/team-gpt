@@ -1,0 +1,27 @@
+{
+  "name": "team-gpt",
+  "version": "0.1.0",
+  "description": "Self-hosted, multi-user ChatGPT for teams. Shared provider keys, per-user budgets and usage tracking, built on top of an OpenAI-compatible LLM gateway.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --import ./test/setup.js --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "llm",
+    "chatgpt",
+    "self-hosted",
+    "team",
+    "gateway",
+    "openai-compatible"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
