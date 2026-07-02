@@ -47,6 +47,15 @@ test('updateUser can change the password', () => {
   assert.ok(authenticate('dave@example.com', 'newpass1'));
 });
 
+test('createUser stores an optional default model; updateUser can change it', () => {
+  const u = createUser({ email: 'fdefault@example.com', password: 'secret1', defaultModel: 'gpt-4o-mini' });
+  assert.equal(u.defaultModel, 'gpt-4o-mini');
+  updateUser(u.id, { defaultModel: 'mock-gpt' });
+  assert.equal(findByEmail('fdefault@example.com').defaultModel, 'mock-gpt');
+  updateUser(u.id, { defaultModel: null });
+  assert.equal(findByEmail('fdefault@example.com').defaultModel, null);
+});
+
 test('effectiveBudget falls back to defaults for null overrides', () => {
   const u = findByEmail('bob@example.com');
   const budget = effectiveBudget(u);

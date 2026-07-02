@@ -38,7 +38,7 @@ export function countUsers() {
   return store.data.users.length;
 }
 
-export function createUser({ email, name, password, role = 'member', budget = {} }) {
+export function createUser({ email, name, password, role = 'member', budget = {}, defaultModel = null }) {
   const e = normalizeEmail(email);
   if (!e || !e.includes('@')) throw new Error('A valid email is required.');
   if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
@@ -54,6 +54,7 @@ export function createUser({ email, name, password, role = 'member', budget = {}
       dailyRequests: budget.dailyRequests ?? null,
       dailyCostUsd: budget.dailyCostUsd ?? null,
     },
+    defaultModel: defaultModel || null,
     disabled: false,
     createdAt: new Date().toISOString(),
   };
@@ -78,6 +79,7 @@ export function updateUser(id, patch) {
     if (patch.role !== undefined) user.role = patch.role === 'admin' ? 'admin' : 'member';
     if (patch.disabled !== undefined) user.disabled = Boolean(patch.disabled);
     if (patch.password) user.passwordHash = hashPassword(patch.password);
+    if (patch.defaultModel !== undefined) user.defaultModel = patch.defaultModel || null;
     if (patch.budget) {
       user.budget = {
         dailyRequests: patch.budget.dailyRequests ?? null,

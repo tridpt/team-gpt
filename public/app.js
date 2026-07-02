@@ -115,6 +115,9 @@ const state = {
   conversations: [],
   activeId: null,
   activeConv: null,
+  convOffset: 0,
+  convHasMore: false,
+  convQuery: '',
   limits: { dailyRequests: null, dailyCostUsd: null },
   usage: { requests: 0, costUsd: 0 },
   sending: false,
@@ -232,10 +235,16 @@ function populateModels() {
 }
 
 /* ── Conversations list ── */
+const CONV_PAGE_SIZE = 50;
+
 async function loadConversations(q = '') {
-  const url = q ? `/api/conversations?q=${encodeURIComponent(q)}` : '/api/conversations';
-  const data = await api(url);
+  state.convQuery = q;
+  const qs = new URLSearchParams({ limit: String(CONV_PAGE_SIZE), offset: '0' });
+  if (q) qs.set('q', q);
+  const data = await api(`/api/conversations?${qs}`);
   state.conversations = data.conversations;
+  state.convOffset = data.conversations.length;
+  state.convHasMore = Boolean(data.hasMore);
   state.limits = data.limits || state.limits;
   state.usage = data.usage || state.usage;
   renderConversations();
@@ -247,6 +256,16 @@ async function loadConversations(q = '') {
       renderEmptyState();
     }
   }
+}
+
+async function loadMoreConversations() {
+  const qs = new URLSearchParams({ limit: String(CONV_PAGE_SIZE), offset: String(state.convOffset) });
+  if (state.convQuery) qs.set('q', state.convQuery);
+  const data = await api(`/api/conversations?${qs}`);
+  state.conversations = state.conversations.concat(data.conversations);
+  state.convOffset += data.conversations.length;
+  state.convHasMore = Boolean(data.hasMore);
+  renderConversations();
 }
 
 let searchTimer = null;
@@ -280,6 +299,14 @@ function renderConversations() {
 
     item.append(title, del);
     list.appendChild(item);
+  }
+
+  if (state.convHasMore) {
+    const more = document.createElement('button');
+    more.className = 'btn ghost load-more';
+    more.textContent = 'Load more';
+    more.addEventListener('click', () => loadMoreConversations());
+    list.appendChild(more);
   }
 }
 

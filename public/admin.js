@@ -141,6 +141,7 @@ function openModal(user) {
   $('#u-email').disabled = editing;
   $('#u-name').value = editing ? user.name || '' : '';
   $('#u-role').value = editing ? user.role : 'member';
+  $('#u-default-model').value = editing ? user.defaultModel || '' : '';
   $('#u-req').value = editing && user.budget?.dailyRequests != null ? user.budget.dailyRequests : '';
   $('#u-cost').value = editing && user.budget?.dailyCostUsd != null ? user.budget.dailyCostUsd : '';
   $('#u-disabled').checked = editing ? Boolean(user.disabled) : false;
@@ -179,6 +180,7 @@ $('#user-form').addEventListener('submit', async (e) => {
     dailyCostUsd: numOrNull($('#u-cost').value),
   };
   const password = $('#u-password').value;
+  const defaultModel = $('#u-default-model').value.trim() || null;
 
   try {
     if (editing) {
@@ -187,6 +189,7 @@ $('#user-form').addEventListener('submit', async (e) => {
         role: $('#u-role').value,
         disabled: $('#u-disabled').checked,
         budget,
+        defaultModel,
       };
       if (password) patch.password = password;
       await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
@@ -197,6 +200,7 @@ $('#user-form').addEventListener('submit', async (e) => {
           email: $('#u-email').value,
           name: $('#u-name').value,
           password,
+          defaultModel,
           role: $('#u-role').value,
           budget,
         }),

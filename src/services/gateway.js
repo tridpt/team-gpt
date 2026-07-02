@@ -27,8 +27,9 @@ function headers() {
  * Streaming chat completion. Calls onDelta(text) for each content chunk and
  * resolves with the full assistant text once the stream completes.
  *
- * The upstream SSE stream does not include token usage, so callers should
- * estimate usage from the prompt + returned text for per-user accounting.
+ * Requests `stream_options.include_usage` so the gateway appends a final chunk
+ * with real token counts. `usage` is null if the gateway didn't provide it, in
+ * which case the caller should fall back to estimating from the text.
  */
 export async function chatStream({ model, messages, signal }, onDelta) {
   let res;
@@ -36,7 +37,7 @@ export async function chatStream({ model, messages, signal }, onDelta) {
     res = await fetch(`${config.gateway.url}/v1/chat/completions`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ model, messages, stream: true }),
+      body: JSON.stringify({ model, messages, stream: true, stream_options: { include_usage: true } }),
       signal,
     });
   } catch (err) {
@@ -52,6 +53,7 @@ export async function chatStream({ model, messages, signal }, onDelta) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullText = '';
+  let usage = null;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -71,6 +73,12 @@ export async function chatStream({ model, messages, signal }, onDelta) {
         if (payload === '[DONE]') continue;
         try {
           const json = JSON.parse(payload);
+          if (json.usage) {
+            usage = {
+              inputTokens: json.usage.prompt_tokens || 0,
+              outputTokens: json.usage.completion_tokens || 0,
+            };
+          }
           const delta = json.choices?.[0]?.delta?.content;
           if (delta) {
             fullText += delta;
@@ -83,7 +91,7 @@ export async function chatStream({ model, messages, signal }, onDelta) {
     }
   }
 
-  return { fullText, model };
+  return { fullText, model, usage };
 }
 
 export { GatewayError };

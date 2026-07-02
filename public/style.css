@@ -98,6 +98,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .conv-search:focus { outline: none; border-color: var(--accent); }
 
 .conv-list { flex: 1; overflow-y: auto; padding: 8px; }
+.load-more { width: 100%; margin-top: 8px; font-size: 13px; }
 .conv-item {
   padding: 10px 12px;
   border-radius: 8px;

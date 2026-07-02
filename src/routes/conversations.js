@@ -10,14 +10,24 @@ export const conversationsRouter = express.Router();
 conversationsRouter.use(requireAuth);
 
 // List the current user's conversations + their live budget/usage.
-// Optional ?q= filters by title/content.
+// Optional ?q= filters by title/content; ?limit=&offset= paginate.
 conversationsRouter.get('/conversations', (req, res) => {
   const q = req.query.q;
-  const list = q
+  const all = q
     ? conversations.searchForUser(req.user.id, q)
     : conversations.listForUser(req.user.id);
+
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const limit = parseInt(req.query.limit, 10);
+  const paginated = Number.isFinite(limit) && limit > 0;
+  const page = paginated ? all.slice(offset, offset + limit) : all;
+  const hasMore = paginated ? offset + limit < all.length : false;
+
   res.json({
-    conversations: list,
+    conversations: page,
+    total: all.length,
+    offset,
+    hasMore,
     usage: usage.getTodayUsage(req.user.id),
     limits: users.effectiveBudget(users.findById(req.user.id)),
   });
@@ -25,7 +35,11 @@ conversationsRouter.get('/conversations', (req, res) => {
 
 conversationsRouter.post('/conversations', (req, res) => {
   const { model, title, systemPrompt } = req.body || {};
-  const chosen = config.availableModels.includes(model) ? model : config.defaultModel;
+  const userDefault =
+    req.user.defaultModel && config.availableModels.includes(req.user.defaultModel)
+      ? req.user.defaultModel
+      : config.defaultModel;
+  const chosen = config.availableModels.includes(model) ? model : userDefault;
   const conv = conversations.create(req.user.id, { model: chosen, title, systemPrompt });
   res.status(201).json(conv);
 });

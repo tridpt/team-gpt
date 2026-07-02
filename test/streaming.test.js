@@ -38,6 +38,11 @@ const fakeGateway = http.createServer((req, res) => {
           i += 1;
         } else {
           clearInterval(timer);
+          if (!fakeGateway.suppressUsage && fakeGateway.lastBody?.stream_options?.include_usage) {
+            res.write(
+              `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 111, completion_tokens: 222, total_tokens: 333 } })}\n\n`
+            );
+          }
           res.write('data: [DONE]\n\n');
           res.end();
         }
@@ -134,7 +139,10 @@ test('streams the reply, persists the assistant message, and records usage', asy
   assert.equal(error, null);
   assert.equal(text, FULL_REPLY, 'client should receive every streamed delta');
   assert.ok(done, 'a done frame must be sent');
-  assert.ok(done.usage.outputTokens > 0, 'usage should be estimated');
+  // Real usage from the gateway (not the local estimate).
+  assert.equal(done.estimated, false);
+  assert.equal(done.usage.inputTokens, 111);
+  assert.equal(done.usage.outputTokens, 222);
   assert.equal(done.conversationId, convId);
 
   // Assistant reply persisted.
@@ -178,6 +186,19 @@ test('the system prompt is forwarded to the gateway', async () => {
   assert.equal(sent.messages[0].role, 'system');
   assert.equal(sent.messages[0].content, 'You are a pirate.');
   assert.equal(sent.stream, true);
+});
+
+test('falls back to estimated usage when the gateway omits it', async () => {
+  fakeGateway.suppressUsage = true;
+  try {
+    const created = await json('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
+    const { text, done } = await stream(`/api/conversations/${created.data.id}/messages`, { content: 'hi' });
+    assert.equal(text, FULL_REPLY);
+    assert.equal(done.estimated, true);
+    assert.ok(done.usage.outputTokens > 0);
+  } finally {
+    fakeGateway.suppressUsage = false;
+  }
 });
 
 test('a gateway failure surfaces as an SSE error frame', async () => {

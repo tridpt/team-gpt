@@ -45,20 +45,27 @@ async function streamReply(req, res, userId, conv) {
   });
 
   try {
-    const { fullText } = await chatStream(
+    const { fullText, usage: realUsage } = await chatStream(
       { model, messages: contextMessages, signal: controller.signal },
       (delta) => send({ type: 'delta', text: delta })
     );
 
     conversations.addMessage(userId, conv.id, { role: 'assistant', content: fullText });
 
-    // Estimate usage (the upstream stream doesn't return token counts).
-    const inputTokens = estimateMessagesTokens(contextMessages);
-    const outputTokens = estimateTokens(fullText);
+    // Prefer the gateway's real token counts; fall back to an estimate if the
+    // upstream stream didn't include usage.
+    const inputTokens = realUsage?.inputTokens ?? estimateMessagesTokens(contextMessages);
+    const outputTokens = realUsage?.outputTokens ?? estimateTokens(fullText);
     const costUsd = computeCost(model, inputTokens, outputTokens);
     usage.record(userId, { inputTokens, outputTokens, costUsd });
 
-    send({ type: 'done', conversationId: conv.id, usage: { inputTokens, outputTokens }, costUsd });
+    send({
+      type: 'done',
+      conversationId: conv.id,
+      usage: { inputTokens, outputTokens },
+      costUsd,
+      estimated: !realUsage,
+    });
     res.write('data: [DONE]\n\n');
     cleanup();
     res.end();

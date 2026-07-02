@@ -26,8 +26,8 @@ adminRouter.get('/users', (req, res) => {
 
 adminRouter.post('/users', (req, res) => {
   try {
-    const { email, name, password, role, budget } = req.body || {};
-    const user = users.createUser({ email, name, password, role, budget });
+    const { email, name, password, role, budget, defaultModel } = req.body || {};
+    const user = users.createUser({ email, name, password, role, budget, defaultModel });
     res.status(201).json(user);
   } catch (err) {
     res.status(400).json({ error: err.message });

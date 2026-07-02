@@ -216,6 +216,48 @@ test('login locks out after too many failed attempts', async () => {
   assert.match(locked.data.error, /too many/i);
 });
 
+test('a per-user default model drives /me and new conversations', async () => {
+  const me = await req('/api/auth/me');
+  const adminId = me.data.user.id;
+
+  await req(`/api/admin/users/${adminId}`, { method: 'PATCH', body: { defaultModel: 'gpt-4o-mini' } });
+
+  const me2 = await req('/api/auth/me');
+  assert.equal(me2.data.config.defaultModel, 'gpt-4o-mini');
+
+  // A conversation created without a model picks up the user default.
+  const conv = await req('/api/conversations', { method: 'POST', body: {} });
+  assert.equal(conv.data.model, 'gpt-4o-mini');
+  await req(`/api/conversations/${conv.data.id}`, { method: 'DELETE' });
+
+  // Reset so later tests keep the global default.
+  await req(`/api/admin/users/${adminId}`, { method: 'PATCH', body: { defaultModel: null } });
+  const me3 = await req('/api/auth/me');
+  assert.equal(me3.data.config.defaultModel, 'mock-gpt');
+});
+
+test('conversation list paginates with limit/offset and hasMore', async () => {
+  const created = [];
+  for (let i = 0; i < 3; i++) {
+    const c = await req('/api/conversations', { method: 'POST', body: { title: `Page test ${i}` } });
+    created.push(c.data.id);
+  }
+
+  const page1 = await req('/api/conversations?limit=2&offset=0');
+  assert.equal(page1.data.conversations.length, 2);
+  assert.equal(page1.data.hasMore, true);
+  assert.ok(page1.data.total >= 3);
+
+  const page2 = await req('/api/conversations?limit=2&offset=2');
+  assert.ok(page2.data.conversations.length >= 1);
+
+  // No pagination params → full list, hasMore false.
+  const all = await req('/api/conversations');
+  assert.equal(all.data.hasMore, false);
+
+  for (const id of created) await req(`/api/conversations/${id}`, { method: 'DELETE' });
+});
+
 test('logout clears the session', async () => {
   await req('/api/auth/logout', { method: 'POST' });
   cookie = ''; // server also cleared it; drop our copy

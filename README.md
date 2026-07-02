@@ -24,10 +24,11 @@ Browser ──▶ TeamGPT (auth, users, budgets, history) ──▶ LLM gateway 
   prompt**, **regenerate** / edit-and-resend the last message, and **export** a
   thread to Markdown or JSON.
 - **Per-user daily budgets** — cap requests/day and cost/day, reset at midnight
-  UTC. Usage is estimated locally for fairness (the gateway remains the source
-  of truth for real spend).
-- **Admin dashboard** — create/edit/disable/delete users, set per-user limits,
-  and view usage plus the gateway's aggregate metrics.
+  UTC. Token usage is taken from the gateway when available (the gateway streams
+  a final usage chunk), and estimated locally otherwise.
+- **Admin dashboard** — create/edit/disable/delete users, set per-user limits
+  and a per-user default model, and view usage plus the gateway's aggregate
+  metrics.
 - **Zero heavy dependencies** — Express + Node built-ins. Data is stored in
   atomic JSON files under `DATA_DIR` (no database to run).
 
@@ -119,7 +120,7 @@ Auth uses a `tg_session` httpOnly cookie set on login.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/conversations` | List conversations + today's usage/limits. Optional `?q=` filters by title/content. |
+| `GET` | `/api/conversations` | List conversations + today's usage/limits. Optional `?q=` filters by title/content; `?limit=&offset=` paginate (response includes `total`, `hasMore`). |
 | `POST` | `/api/conversations` | Create a conversation `{ model, title, systemPrompt }`. |
 | `GET` | `/api/conversations/:id` | Full conversation with messages. |
 | `PATCH` | `/api/conversations/:id` | Update `{ title }`, `{ model }`, and/or `{ systemPrompt }`. |
@@ -140,9 +141,9 @@ data: [DONE]
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/admin/users` | All users with limits + usage. |
-| `POST` | `/api/admin/users` | Create a user. |
+| `POST` | `/api/admin/users` | Create a user (`{ email, name, password, role, budget, defaultModel }`). |
 | `GET` | `/api/admin/users/:id` | One user with full usage. |
-| `PATCH` | `/api/admin/users/:id` | Update name/role/password/budget/disabled. |
+| `PATCH` | `/api/admin/users/:id` | Update name/role/password/budget/defaultModel/disabled. |
 | `DELETE` | `/api/admin/users/:id` | Delete a user and their data. |
 | `GET` | `/api/admin/gateway-metrics` | Proxy the gateway's aggregate metrics. |
 
