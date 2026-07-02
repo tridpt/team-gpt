@@ -80,6 +80,17 @@ export function rename(userId, id, title) {
   });
 }
 
+/** Change the model used for future messages in a conversation. */
+export function setModel(userId, id, model) {
+  return store.update((d) => {
+    const c = d.conversations[id];
+    if (!c || c.userId !== userId) return null;
+    c.model = model;
+    c.updatedAt = new Date().toISOString();
+    return c;
+  });
+}
+
 export function remove(userId, id) {
   return store.update((d) => {
     const c = d.conversations[id];

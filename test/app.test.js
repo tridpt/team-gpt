@@ -86,6 +86,20 @@ test('unknown model falls back to the default', async () => {
   assert.equal(created.data.model, 'mock-gpt');
 });
 
+test('PATCH can change a conversation model and rejects unknown ones', async () => {
+  const created = await req('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
+  const id = created.data.id;
+
+  const ok = await req(`/api/conversations/${id}`, { method: 'PATCH', body: { model: 'gpt-4o-mini' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.data.model, 'gpt-4o-mini');
+
+  const bad = await req(`/api/conversations/${id}`, { method: 'PATCH', body: { model: 'nope' } });
+  assert.equal(bad.status, 400);
+
+  await req(`/api/conversations/${id}`, { method: 'DELETE' });
+});
+
 test('admin can create, list, and delete a member', async () => {
   const create = await req('/api/admin/users', {
     method: 'POST',

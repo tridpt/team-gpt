@@ -23,35 +23,6 @@ function headers() {
   };
 }
 
-/** Non-streaming chat completion. Returns { content, model, usage }. */
-export async function chat({ model, messages }) {
-  let res;
-  try {
-    res = await fetch(`${config.gateway.url}/v1/chat/completions`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ model, messages }),
-    });
-  } catch (err) {
-    throw new GatewayError(`Cannot reach gateway: ${err.message}`, 502);
-  }
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new GatewayError(data?.error?.message || `Gateway returned ${res.status}`, res.status);
-  }
-
-  return {
-    content: data.choices?.[0]?.message?.content || '',
-    model: data.model || model,
-    usage: {
-      inputTokens: data.usage?.prompt_tokens || 0,
-      outputTokens: data.usage?.completion_tokens || 0,
-    },
-    cached: Boolean(data.gateway?.cached),
-  };
-}
-
 /**
  * Streaming chat completion. Calls onDelta(text) for each content chunk and
  * resolves with the full assistant text once the stream completes.

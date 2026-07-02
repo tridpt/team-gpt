@@ -2,6 +2,79 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+/* ── Minimal, XSS-safe Markdown renderer ──
+ * Escapes everything first, then applies a small subset of Markdown. Because
+ * escaping happens before any tag is inserted, model output can never inject
+ * HTML. */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+function renderMarkdown(src) {
+  const codeBlocks = [];
+  // 1) Protect fenced code blocks so their content isn't further formatted.
+  let text = String(src).replace(/```[ \t]*[\w+-]*\n?([\s\S]*?)```/g, (m, code) => {
+    const i = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${escapeHtml(code.replace(/\n+$/, ''))}</code></pre>`);
+    return `\u0000CB${i}\u0000`;
+  });
+
+  // 2) Escape the rest.
+  text = escapeHtml(text);
+
+  // 3) Inline formatting (content is already escaped).
+  text = text.replace(/`([^`\n]+)`/g, (m, c) => `<code>${c}</code>`);
+  text = text.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (m, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`
+  );
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  text = text.replace(/(^|[^_])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
+
+  // 4) Block-level assembly, line by line.
+  const lines = text.split('\n');
+  const html = [];
+  let list = null;
+  let para = [];
+  let quote = [];
+  const flushPara = () => { if (para.length) { html.push(`<p>${para.join('<br>')}</p>`); para = []; } };
+  const flushList = () => { if (list) { html.push(`</${list}>`); list = null; } };
+  const flushQuote = () => { if (quote.length) { html.push(`<blockquote>${quote.join('<br>')}</blockquote>`); quote = []; } };
+  const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const cb = line.match(/^\u0000CB(\d+)\u0000$/);
+    if (cb) { flushAll(); html.push(codeBlocks[Number(cb[1])]); continue; }
+    if (line.trim() === '') { flushAll(); continue; }
+
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flushAll(); const lvl = Math.min(h[1].length, 3); html.push(`<h${lvl}>${h[2]}</h${lvl}>`); continue; }
+
+    const ul = line.match(/^[-*+]\s+(.*)$/);
+    const ol = line.match(/^\d+\.\s+(.*)$/);
+    if (ul || ol) {
+      flushPara(); flushQuote();
+      const want = ul ? 'ul' : 'ol';
+      if (list !== want) { flushList(); list = want; html.push(`<${want}>`); }
+      html.push(`<li>${ul ? ul[1] : ol[1]}</li>`);
+      continue;
+    }
+    flushList();
+
+    const bq = line.match(/^>\s?(.*)$/);
+    if (bq) { flushPara(); quote.push(bq[1]); continue; }
+    flushQuote();
+
+    para.push(line);
+  }
+  flushAll();
+  return html.join('\n');
+}
+
 const state = {
   user: null,
   config: { defaultModel: '', availableModels: [] },
@@ -10,6 +83,7 @@ const state = {
   limits: { dailyRequests: null, dailyCostUsd: null },
   usage: { requests: 0, costUsd: 0 },
   sending: false,
+  abort: null,
 };
 
 /* ── API helpers ── */
@@ -234,7 +308,12 @@ function appendMessage(role, content) {
 
   const contentEl = document.createElement('div');
   contentEl.className = 'content';
-  contentEl.textContent = content;
+  if (role === 'assistant') {
+    contentEl.classList.add('md');
+    contentEl.innerHTML = renderMarkdown(content);
+  } else {
+    contentEl.textContent = content;
+  }
 
   msg.append(avatar, contentEl);
   wrap.appendChild(msg);
@@ -259,8 +338,9 @@ async function sendMessage() {
   }
   const convId = state.activeId;
 
-  state.sending = true;
-  setComposerEnabled(false);
+  const ac = new AbortController();
+  state.abort = ac;
+  setSending(true);
   input.value = '';
   autoGrow(input);
 
@@ -274,6 +354,7 @@ async function sendMessage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
+      signal: ac.signal,
     });
 
     if (!res.ok || !res.body) {
@@ -310,7 +391,7 @@ async function sendMessage() {
           }
           if (evt.type === 'delta') {
             text += evt.text;
-            assistantEl.textContent = text;
+            assistantEl.innerHTML = renderMarkdown(text);
             scrollToBottom();
           } else if (evt.type === 'done') {
             onMessageDone(convId, evt);
@@ -322,12 +403,20 @@ async function sendMessage() {
       }
     }
   } catch (err) {
-    assistantEl.textContent = `⚠ ${err.message}`;
-    assistantEl.classList.add('error-msg');
+    if (err.name === 'AbortError') {
+      // User pressed Stop; keep whatever streamed so far.
+      if (!assistantEl.textContent.trim()) {
+        assistantEl.textContent = '(stopped)';
+        assistantEl.classList.add('muted');
+      }
+    } else {
+      assistantEl.textContent = `⚠ ${err.message}`;
+      assistantEl.classList.add('error-msg');
+    }
   } finally {
     assistantEl.classList.remove('streaming');
-    state.sending = false;
-    setComposerEnabled(true);
+    state.abort = null;
+    setSending(false);
     input.focus();
   }
 }
@@ -340,12 +429,15 @@ function onMessageDone(convId, evt) {
   loadConversations();
 }
 
-function setComposerEnabled(enabled) {
-  $('#send-btn').disabled = !enabled;
-  $('#input').disabled = !enabled;
+function setSending(sending) {
+  state.sending = sending;
+  $('#send-btn').classList.toggle('hidden', sending);
+  $('#stop-btn').classList.toggle('hidden', !sending);
+  $('#input').disabled = sending;
 }
 
 $('#send-btn').addEventListener('click', () => sendMessage());
+$('#stop-btn').addEventListener('click', () => state.abort?.abort());
 
 $('#input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -361,12 +453,21 @@ function autoGrow(el) {
   el.style.height = Math.min(el.scrollHeight, 200) + 'px';
 }
 
-$('#model-select').addEventListener('change', () => {
-  // A conversation's model is fixed when it's created. Changing the dropdown
-  // applies to the next new chat, so hint that when a conversation is open.
-  $('#model-hint').textContent = state.activeId
-    ? 'Model applies to new chats'
-    : '';
+$('#model-select').addEventListener('change', async () => {
+  const model = $('#model-select').value;
+  if (!state.activeId) return; // applies to the next new chat
+  try {
+    await api(`/api/conversations/${state.activeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ model }),
+    });
+    const c = state.conversations.find((x) => x.id === state.activeId);
+    if (c) c.model = model;
+    $('#model-hint').textContent = 'Model updated';
+    setTimeout(() => { $('#model-hint').textContent = ''; }, 1500);
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 /* ── Budget box ── */

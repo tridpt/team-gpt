@@ -32,8 +32,27 @@ conversationsRouter.get('/conversations/:id', (req, res) => {
 });
 
 conversationsRouter.patch('/conversations/:id', (req, res) => {
-  const { title } = req.body || {};
-  const conv = conversations.rename(req.user.id, req.params.id, title);
+  const { title, model } = req.body || {};
+
+  // Update the model if a valid one was provided.
+  if (model !== undefined) {
+    if (!config.availableModels.includes(model)) {
+      return res.status(400).json({ error: 'Unknown model.' });
+    }
+    const updated = conversations.setModel(req.user.id, req.params.id, model);
+    if (!updated) return res.status(404).json({ error: 'Conversation not found.' });
+    if (title === undefined) return res.json(updated);
+  }
+
+  // Update the title if provided.
+  if (title !== undefined) {
+    const conv = conversations.rename(req.user.id, req.params.id, title);
+    if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
+    return res.json(conv);
+  }
+
+  // Nothing to change: return the current conversation.
+  const conv = conversations.get(req.user.id, req.params.id);
   if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
   res.json(conv);
 });

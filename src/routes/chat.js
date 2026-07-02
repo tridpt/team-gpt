@@ -48,7 +48,16 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
   const controller = new AbortController();
-  req.on('close', () => controller.abort());
+
+  // Keep the connection alive through proxies during long generations. SSE
+  // comment lines (starting with ':') are ignored by the client parser.
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000);
+  const cleanup = () => clearInterval(heartbeat);
+
+  req.on('close', () => {
+    controller.abort();
+    cleanup();
+  });
 
   try {
     const { fullText } = await chatStream(
@@ -72,8 +81,10 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
       costUsd,
     });
     res.write('data: [DONE]\n\n');
+    cleanup();
     res.end();
   } catch (err) {
+    cleanup();
     if (controller.signal.aborted) {
       // Client disconnected mid-stream; nothing more to send.
       return res.end();

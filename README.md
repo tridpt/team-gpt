@@ -17,7 +17,9 @@ Browser ──▶ TeamGPT (auth, users, budgets, history) ──▶ LLM gateway 
 - **Multi-user accounts** with `admin` / `member` roles and server-side sessions
   (httpOnly cookies, scrypt-hashed passwords — no external auth dependency).
 - **Streaming chat** over Server-Sent Events, with saved per-user conversation
-  history and automatic titles.
+  history and automatic titles. Assistant replies render **Markdown** (code
+  blocks, lists, links…) and generation can be interrupted with a **Stop**
+  button. The model can be switched mid-conversation.
 - **Per-user daily budgets** — cap requests/day and cost/day, reset at midnight
   UTC. Usage is estimated locally for fairness (the gateway remains the source
   of truth for real spend).
@@ -117,7 +119,7 @@ Auth uses a `tg_session` httpOnly cookie set on login.
 | `GET` | `/api/conversations` | List conversations + today's usage/limits. |
 | `POST` | `/api/conversations` | Create a conversation `{ model, title }`. |
 | `GET` | `/api/conversations/:id` | Full conversation with messages. |
-| `PATCH` | `/api/conversations/:id` | Rename `{ title }`. |
+| `PATCH` | `/api/conversations/:id` | Rename `{ title }` and/or switch `{ model }`. |
 | `DELETE` | `/api/conversations/:id` | Delete a conversation. |
 | `POST` | `/api/conversations/:id/messages` | Send `{ content }`; streams the reply as SSE. |
 

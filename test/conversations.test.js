@@ -7,6 +7,7 @@ import {
   listForUser,
   contextMessages,
   rename,
+  setModel,
   remove,
 } from '../src/services/conversations.js';
 
@@ -65,6 +66,14 @@ test('listForUser returns metadata with a message count, most-recent first', () 
   assert.equal(list[0].id, newer.id);
   assert.equal(list[0].messageCount, 1);
   assert.equal(list[0].messages, undefined);
+});
+
+test('setModel changes the model and enforces ownership', () => {
+  const c = create('modeler', { model: 'mock-gpt' });
+  assert.equal(setModel('intruder', c.id, 'gpt-4o-mini'), null);
+  const updated = setModel('modeler', c.id, 'gpt-4o-mini');
+  assert.equal(updated.model, 'gpt-4o-mini');
+  assert.equal(get('modeler', c.id).model, 'gpt-4o-mini');
 });
 
 test('rename and remove enforce ownership', () => {
