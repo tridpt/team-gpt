@@ -768,14 +768,22 @@ thật** và **không cần gateway đang chạy**.
 - `usage.test.js` — ghi usage, chặn theo request/chi phí, "không giới hạn".
 - `users.test.js` — validate email/mật khẩu, chống trùng email, đăng nhập, user
   bị disable, đổi mật khẩu, hạn mức override.
-- `conversations.test.js` — quyền sở hữu, tự đặt tiêu đề, cắt ngữ cảnh 20 tin.
+- `conversations.test.js` — quyền sở hữu, tự đặt tiêu đề, cắt ngữ cảnh 20 tin,
+  system prompt, tìm kiếm, chuẩn bị regenerate.
+- `streaming.test.js` — **test hồi quy streaming**: dựng một *fake gateway* trả
+  SSE giả, rồi chạy thật luồng gửi tin + regenerate qua HTTP để kiểm tra client
+  nhận đủ `delta` + `done`, assistant được lưu, usage được ghi, và system prompt
+  được chuyển lên gateway. Test này bắt được đúng lỗi hủy stream sớm
+  (`req` vs `res` `'close'`).
 - `app.test.js` — **test tích hợp**: khởi động app Express thật trên cổng ngẫu
   nhiên rồi gọi qua HTTP (đăng nhập, CRUD hội thoại, quản trị user, các chốt an
   toàn admin).
 
-**Vì sao test được luồng chat mà không cần gateway thật?** Các test tập trung
-vào phần logic nội bộ (auth, budget, hội thoại). Phần gọi gateway được tách riêng
-trong `gateway.js`, nên không cần mạng để kiểm thử các nghiệp vụ còn lại.
+**Vì sao test được luồng chat mà không cần gateway thật?** `streaming.test.js`
+dựng một **fake gateway** (HTTP server nhỏ ngay trong test) phát SSE giả, rồi gán
+`config.gateway.url` trỏ vào nó. Nhờ vậy kiểm thử được toàn bộ luồng streaming
+end-to-end mà không cần llm-gateway thật hay mạng. Các bộ test còn lại tập trung
+vào logic nội bộ (auth, budget, hội thoại).
 
 ---
 
