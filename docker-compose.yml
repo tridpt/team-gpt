@@ -1,0 +1,57 @@
+# Run the whole stack with:  docker compose up --build
+#
+# This brings up the LLM gateway (built from the sibling ../llm-gateway repo)
+# and TeamGPT together. TeamGPT talks to the gateway over the internal Docker
+# network at http://gateway:8080, so provider keys stay in the gateway only.
+#
+# Compose reads the local .env for ${VAR} interpolation; every var has a safe
+# default, so it also boots with no .env (using the gateway's mock provider).
+#
+# Note: the `gateway` service builds from ../llm-gateway. If you only have the
+# TeamGPT repo, point GATEWAY_URL at an existing gateway and remove that service.
+services:
+  gateway:
+    build: ../llm-gateway
+    image: llm-gateway:latest
+    environment:
+      PORT: "8080"
+      GATEWAY_API_KEYS: "${GATEWAY_API_KEY:-demo-key-123}"
+      PROVIDER_ORDER: "${PROVIDER_ORDER:-mock}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      LOG_TO_FILE: "false"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  teamgpt:
+    build: .
+    image: team-gpt:latest
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      PORT: "4000"
+      DATA_DIR: "/app/data"
+      GATEWAY_URL: "http://gateway:8080"
+      GATEWAY_API_KEY: "${GATEWAY_API_KEY:-demo-key-123}"
+      DEFAULT_MODEL: "${DEFAULT_MODEL:-mock-gpt}"
+      AVAILABLE_MODELS: "${AVAILABLE_MODELS:-gpt-4o-mini,gemini-2.0-flash,mock-gpt}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-change-me-now}"
+      DEFAULT_DAILY_REQUESTS: "${DEFAULT_DAILY_REQUESTS:-}"
+      DEFAULT_DAILY_COST_USD: "${DEFAULT_DAILY_COST_USD:-}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+    volumes:
+      - teamgpt-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  teamgpt-data:

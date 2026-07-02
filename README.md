@@ -49,6 +49,29 @@ For development with auto-reload:
 npm run dev
 ```
 
+## Run with Docker
+
+Bring up TeamGPT together with the LLM gateway (built from the sibling
+`../llm-gateway` repo) in one command:
+
+```bash
+docker compose up --build
+```
+
+TeamGPT is served on http://localhost:4000 and talks to the gateway over the
+internal Docker network, so no provider keys live in TeamGPT. Data persists in
+the `teamgpt-data` named volume. Configure via a local `.env` (see below) — every
+variable has a safe default, so it also boots with nothing configured (using the
+gateway's mock provider).
+
+To build and run just the TeamGPT image against an existing gateway:
+
+```bash
+docker build -t team-gpt .
+docker run -p 4000:4000 -e GATEWAY_URL=http://your-gateway:8080 \
+  -e GATEWAY_API_KEY=your-key -v teamgpt-data:/app/data team-gpt
+```
+
 ## Configuration
 
 All configuration is via environment variables (loaded from `.env` if present).
