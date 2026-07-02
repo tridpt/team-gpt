@@ -21,14 +21,18 @@ Browser ──▶ TeamGPT (auth, users, budgets, history) ──▶ LLM gateway 
   blocks with light syntax highlighting, lists, links…) and generation can be
   interrupted with a **Stop** button. The model can be switched mid-conversation.
 - **Conversation tools**: search by title/content, a per-conversation **system
-  prompt**, **regenerate** / edit-and-resend the last message, and **export** a
-  thread to Markdown or JSON.
+  prompt**, **regenerate** / edit-and-resend the last message, **export** a
+  thread to Markdown or JSON, and **attach text files** (read in the browser and
+  prepended to the prompt as fenced blocks, so any model can use them).
 - **Per-user daily budgets** — cap requests/day and cost/day, reset at midnight
   UTC. Token usage is taken from the gateway when available (the gateway streams
   a final usage chunk), and estimated locally otherwise.
+- **Groups / departments** — assign users to a group with a **shared daily
+  budget** (requests + cost) enforced across all members, in addition to each
+  user's own limits.
 - **Admin dashboard** — create/edit/disable/delete users, set per-user limits
-  and a per-user default model, and view usage plus the gateway's aggregate
-  metrics.
+  and a per-user default model, manage groups, and view usage plus the gateway's
+  aggregate metrics.
 - **Zero heavy dependencies** — Express + Node built-ins. Data is stored in
   atomic JSON files under `DATA_DIR` (no database to run).
 

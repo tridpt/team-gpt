@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import * as users from '../services/users.js';
 import * as conversations from '../services/conversations.js';
 import * as usage from '../services/usage.js';
+import * as groups from '../services/groups.js';
 import { chatStream, GatewayError } from '../services/gateway.js';
 import { estimateMessagesTokens, estimateTokens, computeCost } from '../services/cost.js';
 
@@ -86,12 +87,39 @@ async function streamReply(req, res, userId, conv) {
 }
 
 function budgetGuard(req, res) {
-  const limits = users.effectiveBudget(users.findById(req.user.id));
+  const full = users.findById(req.user.id);
+
+  // 1) Per-user budget.
+  const limits = users.effectiveBudget(full);
   const budget = usage.checkBudget(req.user.id, limits);
   if (!budget.allowed) {
     res.status(429).json({ error: budget.reason, usage: budget.usage, limits });
     return false;
   }
+
+  // 2) Shared group budget (enforced in addition to the user's own).
+  const group = full?.groupId ? groups.get(full.groupId) : null;
+  if (group && (group.budget.dailyRequests != null || group.budget.dailyCostUsd != null)) {
+    const memberIds = users.membersOf(group.id).map((u) => u.id);
+    const groupUsage = usage.sumTodayUsage(memberIds);
+    if (group.budget.dailyRequests != null && groupUsage.requests >= group.budget.dailyRequests) {
+      res.status(429).json({
+        error: `Group daily request limit reached (${group.budget.dailyRequests}/day for "${group.name}").`,
+        usage: groupUsage,
+        limits: group.budget,
+      });
+      return false;
+    }
+    if (group.budget.dailyCostUsd != null && groupUsage.costUsd >= group.budget.dailyCostUsd) {
+      res.status(429).json({
+        error: `Group daily cost budget reached ($${group.budget.dailyCostUsd}/day for "${group.name}").`,
+        usage: groupUsage,
+        limits: group.budget,
+      });
+      return false;
+    }
+  }
+
   return true;
 }
 

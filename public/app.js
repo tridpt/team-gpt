@@ -122,6 +122,7 @@ const state = {
   usage: { requests: 0, costUsd: 0 },
   sending: false,
   abort: null,
+  attachments: [], // [{ name, text }]
 };
 
 /* ── API helpers ── */
@@ -404,8 +405,9 @@ function scrollToBottom() {
 /* ── Sending / streaming ── */
 async function sendMessage() {
   const input = $('#input');
-  const content = input.value.trim();
-  if (!content || state.sending) return;
+  const typed = input.value.trim();
+  const files = state.attachments;
+  if ((!typed && !files.length) || state.sending) return;
 
   // Create a conversation on the fly if none is active.
   if (!state.activeId) {
@@ -413,10 +415,17 @@ async function sendMessage() {
   }
   const convId = state.activeId;
 
+  // Build the payload sent upstream: attachment contents are prepended to the
+  // typed message as fenced blocks so any model (not just multimodal) can use
+  // them. The bubble shows the typed text plus a compact list of file names.
+  const content = buildMessageWithAttachments(typed, files);
+  const display = typed + (files.length ? `\n\n📎 ${files.map((f) => f.name).join(', ')}` : '');
+
   input.value = '';
   autoGrow(input);
+  clearAttachments();
   document.getElementById('msg-actions')?.remove();
-  appendMessage('user', content);
+  appendMessage('user', display.trim());
 
   const ac = new AbortController();
   state.abort = ac;
@@ -426,6 +435,15 @@ async function sendMessage() {
   scrollToBottom();
 
   await runStream(`/api/conversations/${convId}/messages`, { content }, assistantEl, ac);
+}
+
+/** Prepend attached text files to the message as labelled fenced blocks. */
+function buildMessageWithAttachments(text, files) {
+  if (!files.length) return text;
+  const blocks = files
+    .map((f) => `File: ${f.name}\n\`\`\`\n${f.content}\n\`\`\``)
+    .join('\n\n');
+  return text ? `${blocks}\n\n${text}` : blocks;
 }
 
 /** Regenerate the last reply; pass newContent to edit-and-resend the prompt. */
@@ -603,6 +621,60 @@ $('#input').addEventListener('keydown', (e) => {
 });
 
 $('#input').addEventListener('input', (e) => autoGrow(e.target));
+
+/* ── Attachments (text files, read client-side) ── */
+const MAX_ATTACH_BYTES = 128 * 1024; // 128 KB per file
+const MAX_ATTACHMENTS = 5;
+
+$('#attach-btn').addEventListener('click', () => $('#attach-input').click());
+
+$('#attach-input').addEventListener('change', async (e) => {
+  const picked = [...e.target.files];
+  e.target.value = ''; // allow re-picking the same file
+  for (const file of picked) {
+    if (state.attachments.length >= MAX_ATTACHMENTS) {
+      alert(`You can attach at most ${MAX_ATTACHMENTS} files.`);
+      break;
+    }
+    if (file.size > MAX_ATTACH_BYTES) {
+      alert(`"${file.name}" is too large (max ${MAX_ATTACH_BYTES / 1024} KB of text).`);
+      continue;
+    }
+    try {
+      const content = await file.text();
+      state.attachments.push({ name: file.name, content });
+    } catch {
+      alert(`Could not read "${file.name}".`);
+    }
+  }
+  renderAttachments();
+});
+
+function clearAttachments() {
+  state.attachments = [];
+  renderAttachments();
+}
+
+function renderAttachments() {
+  const box = $('#attachments');
+  box.innerHTML = '';
+  box.classList.toggle('hidden', !state.attachments.length);
+  state.attachments.forEach((f, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'attach-chip';
+    const name = document.createElement('span');
+    name.textContent = `📎 ${f.name}`;
+    const rm = document.createElement('button');
+    rm.textContent = '×';
+    rm.title = 'Remove';
+    rm.addEventListener('click', () => {
+      state.attachments.splice(i, 1);
+      renderAttachments();
+    });
+    chip.append(name, rm);
+    box.appendChild(chip);
+  });
+}
 
 function autoGrow(el) {
   el.style.height = 'auto';

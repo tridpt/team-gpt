@@ -215,6 +215,17 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .composer textarea:focus { outline: none; border-color: var(--accent); }
 .composer .send { height: 46px; padding: 0 18px; }
+.composer .attach { height: 46px; width: 46px; padding: 0; font-size: 18px; }
+
+/* Attachment chips above the composer */
+.attachments { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.attach-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 10px; font-size: 13px; color: var(--text);
+}
+.attach-chip button { background: none; border: none; color: var(--muted); font-size: 15px; line-height: 1; }
+.attach-chip button:hover { color: var(--danger); }
 
 /* ── Admin ── */
 .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }

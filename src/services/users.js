@@ -38,7 +38,7 @@ export function countUsers() {
   return store.data.users.length;
 }
 
-export function createUser({ email, name, password, role = 'member', budget = {}, defaultModel = null }) {
+export function createUser({ email, name, password, role = 'member', budget = {}, defaultModel = null, groupId = null }) {
   const e = normalizeEmail(email);
   if (!e || !e.includes('@')) throw new Error('A valid email is required.');
   if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
@@ -55,10 +55,10 @@ export function createUser({ email, name, password, role = 'member', budget = {}
       dailyCostUsd: budget.dailyCostUsd ?? null,
     },
     defaultModel: defaultModel || null,
+    groupId: groupId || null,
     disabled: false,
     createdAt: new Date().toISOString(),
   };
-
   store.update((d) => d.users.push(user));
   return publicUser(user);
 }
@@ -80,6 +80,7 @@ export function updateUser(id, patch) {
     if (patch.disabled !== undefined) user.disabled = Boolean(patch.disabled);
     if (patch.password) user.passwordHash = hashPassword(patch.password);
     if (patch.defaultModel !== undefined) user.defaultModel = patch.defaultModel || null;
+    if (patch.groupId !== undefined) user.groupId = patch.groupId || null;
     if (patch.budget) {
       user.budget = {
         dailyRequests: patch.budget.dailyRequests ?? null,
@@ -99,13 +100,36 @@ export function deleteUser(id) {
   });
 }
 
-/** Resolve the effective daily budget for a user (override → default). */
+/** Public users belonging to a group. */
+export function membersOf(groupId) {
+  return store.data.users.filter((u) => u.groupId === groupId).map(publicUser);
+}
+
+/** Remove a group assignment from every member (e.g. when a group is deleted). */
+export function clearGroup(groupId) {
+  store.update((d) => {
+    for (const u of d.users) {
+      if (u.groupId === groupId) u.groupId = null;
+    }
+  });
+}
+
+/** Resolve the effective daily budget for a user (personal override → default). */
 export function effectiveBudget(user) {
   const b = user?.budget || {};
   return {
     dailyRequests: b.dailyRequests ?? config.defaultBudget.dailyRequests,
     dailyCostUsd: b.dailyCostUsd ?? config.defaultBudget.dailyCostUsd,
   };
+}
+
+/**
+ * Resolve the effective default model for a user: the user's own default if it
+ * is still a valid/available model, otherwise the global default.
+ */
+export function effectiveDefaultModel(user) {
+  const m = user?.defaultModel;
+  return m && config.availableModels.includes(m) ? m : config.defaultModel;
 }
 
 /** Create the seed admin from env if there are no users yet. */

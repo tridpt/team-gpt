@@ -106,3 +106,15 @@ export function deleteUserUsage(userId) {
     delete d.users[userId];
   });
 }
+
+/** Sum today's usage across a set of users (for group budgets). */
+export function sumTodayUsage(userIds) {
+  let requests = 0;
+  let costUsd = 0;
+  for (const id of userIds) {
+    const u = getTodayUsage(id);
+    requests += u.requests;
+    costUsd += u.costUsd;
+  }
+  return { requests, costUsd: round(costUsd) };
+}

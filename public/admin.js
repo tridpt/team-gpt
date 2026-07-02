@@ -4,6 +4,7 @@ const $ = (sel) => document.querySelector(sel);
 
 const state = {
   users: [],
+  groups: [],
   defaultBudget: { dailyRequests: null, dailyCostUsd: null },
 };
 
@@ -29,9 +30,17 @@ function setError(msg) {
 async function loadAll() {
   setError('');
   try {
+    // Load groups first so the users table / modal can resolve group names.
+    try {
+      const g = await api('/api/admin/groups');
+      state.groups = g.groups || [];
+    } catch {
+      state.groups = [];
+    }
     const data = await api('/api/admin/users');
     state.users = data.users;
     state.defaultBudget = data.defaultBudget || state.defaultBudget;
+    renderGroups();
     renderUsers();
   } catch (err) {
     if (err.status === 401) {
@@ -45,6 +54,44 @@ async function loadAll() {
     setError(err.message);
   }
   loadGatewayMetrics();
+}
+
+/* ── Groups ── */
+function renderGroups() {
+  const body = $('#groups-body');
+  if (!body) return;
+  body.innerHTML = '';
+  if (!state.groups.length) {
+    body.innerHTML = '<tr><td colspan="4" class="muted">No groups yet.</td></tr>';
+    return;
+  }
+  for (const g of state.groups) {
+    const memberCount = state.users.filter((u) => u.groupId === g.id).length;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${escapeHtml(g.name)}</td>` +
+      `<td class="muted">${fmtLimit(g.budget || {})}</td>` +
+      `<td>${memberCount}</td>`;
+
+    const actions = document.createElement('td');
+    actions.className = 'row-actions';
+    const edit = document.createElement('button');
+    edit.className = 'btn ghost';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', () => openGroupModal(g));
+    const del = document.createElement('button');
+    del.className = 'btn danger';
+    del.textContent = 'Delete';
+    del.addEventListener('click', () => deleteGroup(g));
+    actions.append(edit, del);
+    tr.appendChild(actions);
+    body.appendChild(tr);
+  }
+}
+
+function groupName(id) {
+  const g = state.groups.find((x) => x.id === id);
+  return g ? g.name : null;
 }
 
 async function loadGatewayMetrics() {
@@ -96,9 +143,11 @@ function renderUsers() {
     const today = u.usage?.today || {};
     const totals = u.usage?.totals || {};
 
+    const gName = u.groupName || groupName(u.groupId);
     tr.innerHTML =
       `<td><div>${escapeHtml(u.name || '')}</div><div class="muted">${escapeHtml(u.email)}</div></td>` +
       `<td><span class="badge ${u.role === 'admin' ? 'admin' : ''}">${u.role}</span></td>` +
+      `<td class="muted">${gName ? escapeHtml(gName) : '—'}</td>` +
       `<td>${today.requests || 0} · $${(today.costUsd || 0).toFixed(4)}</td>` +
       `<td>${totals.requests || 0} · $${(totals.costUsd || 0).toFixed(4)}</td>` +
       `<td class="muted">${fmtLimit(u.limits || {})}</td>` +
@@ -146,6 +195,17 @@ function openModal(user) {
   $('#u-cost').value = editing && user.budget?.dailyCostUsd != null ? user.budget.dailyCostUsd : '';
   $('#u-disabled').checked = editing ? Boolean(user.disabled) : false;
 
+  // Populate the group dropdown (blank option = no group).
+  const gsel = $('#u-group');
+  gsel.innerHTML = '<option value="">— none —</option>';
+  for (const g of state.groups) {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.name;
+    gsel.appendChild(opt);
+  }
+  gsel.value = editing && user.groupId ? user.groupId : '';
+
   $('#pw-hint').textContent = editing ? '(leave blank to keep current)' : '(min 6 characters)';
   $('#disabled-field').classList.toggle('hidden', !editing);
 
@@ -181,6 +241,7 @@ $('#user-form').addEventListener('submit', async (e) => {
   };
   const password = $('#u-password').value;
   const defaultModel = $('#u-default-model').value.trim() || null;
+  const groupId = $('#u-group').value || null;
 
   try {
     if (editing) {
@@ -190,6 +251,7 @@ $('#user-form').addEventListener('submit', async (e) => {
         disabled: $('#u-disabled').checked,
         budget,
         defaultModel,
+        groupId,
       };
       if (password) patch.password = password;
       await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
@@ -201,6 +263,7 @@ $('#user-form').addEventListener('submit', async (e) => {
           name: $('#u-name').value,
           password,
           defaultModel,
+          groupId,
           role: $('#u-role').value,
           budget,
         }),
@@ -217,6 +280,68 @@ async function deleteUser(u) {
   if (!confirm(`Delete user ${u.email}? This removes their conversations and usage.`)) return;
   try {
     await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+    loadAll();
+  } catch (err) {
+    setError(err.message);
+  }
+}
+
+/* ── Group modal (create / edit) ── */
+function openGroupModal(group) {
+  const editing = Boolean(group);
+  $('#group-modal-title').textContent = editing ? 'Edit group' : 'New group';
+  $('#group-modal-error').textContent = '';
+  $('#group-form').reset();
+
+  $('#g-id').value = editing ? group.id : '';
+  $('#g-name').value = editing ? group.name : '';
+  $('#g-req').value = editing && group.budget?.dailyRequests != null ? group.budget.dailyRequests : '';
+  $('#g-cost').value = editing && group.budget?.dailyCostUsd != null ? group.budget.dailyCostUsd : '';
+
+  $('#group-modal').classList.remove('hidden');
+}
+
+function closeGroupModal() {
+  $('#group-modal').classList.add('hidden');
+}
+
+$('#new-group-btn').addEventListener('click', () => openGroupModal(null));
+$('#group-modal-cancel').addEventListener('click', closeGroupModal);
+$('#group-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'group-modal') closeGroupModal();
+});
+
+$('#group-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#group-modal-error').textContent = '';
+  const id = $('#g-id').value;
+  const editing = Boolean(id);
+
+  const body = {
+    name: $('#g-name').value,
+    budget: {
+      dailyRequests: numOrNull($('#g-req').value),
+      dailyCostUsd: numOrNull($('#g-cost').value),
+    },
+  };
+
+  try {
+    if (editing) {
+      await api(`/api/admin/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    } else {
+      await api('/api/admin/groups', { method: 'POST', body: JSON.stringify(body) });
+    }
+    closeGroupModal();
+    loadAll();
+  } catch (err) {
+    $('#group-modal-error').textContent = err.message;
+  }
+});
+
+async function deleteGroup(g) {
+  if (!confirm(`Delete group "${g.name}"? Members will be unassigned (their own budgets still apply).`)) return;
+  try {
+    await api(`/api/admin/groups/${g.id}`, { method: 'DELETE' });
     loadAll();
   } catch (err) {
     setError(err.message);

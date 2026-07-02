@@ -65,7 +65,11 @@
       </div>
       <div class="messages" id="messages"></div>
       <div class="composer">
+        <div class="attachments" id="attachments"></div>
         <div class="composer-inner">
+          <input type="file" id="file-input" class="hidden" multiple
+                 accept=".txt,.md,.markdown,.csv,.json,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.cs,.php,.sh,.yml,.yaml,.xml,.html,.css,.sql,.log,.ini,.toml,.env,.text" />
+          <button class="btn ghost attach" id="attach-btn" title="Attach text files">📎</button>
           <textarea id="input" placeholder="Send a message…" rows="1"></textarea>
           <button class="btn send" id="send-btn">Send</button>
           <button class="btn danger send hidden" id="stop-btn">Stop</button>

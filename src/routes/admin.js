@@ -4,6 +4,7 @@ import { requireAdmin } from '../middleware/auth.js';
 import * as users from '../services/users.js';
 import * as usage from '../services/usage.js';
 import * as conversations from '../services/conversations.js';
+import * as groups from '../services/groups.js';
 import { destroyUserSessions } from '../services/sessions.js';
 
 export const adminRouter = express.Router();
@@ -15,9 +16,11 @@ adminRouter.get('/users', (req, res) => {
   const rows = users.listUsers().map((u) => {
     const full = users.findById(u.id);
     const u2 = usage.getUserUsage(u.id);
+    const group = full.groupId ? groups.get(full.groupId) : null;
     return {
       ...u,
       limits: users.effectiveBudget(full),
+      groupName: group ? group.name : null,
       usage: { today: u2.today, totals: u2.totals },
     };
   });
@@ -26,8 +29,11 @@ adminRouter.get('/users', (req, res) => {
 
 adminRouter.post('/users', (req, res) => {
   try {
-    const { email, name, password, role, budget, defaultModel } = req.body || {};
-    const user = users.createUser({ email, name, password, role, budget, defaultModel });
+    const { email, name, password, role, budget, defaultModel, groupId } = req.body || {};
+    if (groupId && !groups.get(groupId)) {
+      return res.status(400).json({ error: 'Unknown group.' });
+    }
+    const user = users.createUser({ email, name, password, role, budget, defaultModel, groupId });
     res.status(201).json(user);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -52,6 +58,10 @@ adminRouter.patch('/users/:id', (req, res) => {
     if (activeAdmins.length <= 1) {
       return res.status(400).json({ error: 'Cannot demote or disable the last active admin.' });
     }
+  }
+
+  if (patch.groupId !== undefined && patch.groupId && !groups.get(patch.groupId)) {
+    return res.status(400).json({ error: 'Unknown group.' });
   }
 
   const updated = users.updateUser(req.params.id, patch);
@@ -83,4 +93,43 @@ adminRouter.get('/gateway-metrics', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: `Cannot reach gateway: ${err.message}` });
   }
+});
+
+// ── Groups (departments/teams) ────────────────────────────
+// Each group has an optional shared daily budget. Listing includes the
+// group's live combined usage (sum across members) for the dashboard.
+adminRouter.get('/groups', (req, res) => {
+  const rows = groups.list().map((g) => {
+    const members = users.membersOf(g.id);
+    const memberIds = members.map((m) => m.id);
+    return {
+      ...g,
+      memberCount: members.length,
+      usage: usage.sumTodayUsage(memberIds),
+    };
+  });
+  res.json({ groups: rows });
+});
+
+adminRouter.post('/groups', (req, res) => {
+  try {
+    const { name, budget } = req.body || {};
+    const group = groups.create({ name, budget });
+    res.status(201).json(group);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+adminRouter.patch('/groups/:id', (req, res) => {
+  const updated = groups.update(req.params.id, req.body || {});
+  if (!updated) return res.status(404).json({ error: 'Group not found.' });
+  res.json(updated);
+});
+
+adminRouter.delete('/groups/:id', (req, res) => {
+  const ok = groups.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Group not found.' });
+  users.clearGroup(req.params.id); // unassign members so they fall back to personal limits
+  res.json({ ok: true });
 });

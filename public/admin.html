@@ -27,6 +27,7 @@
         <tr>
           <th>User</th>
           <th>Role</th>
+          <th>Group</th>
           <th>Today (req / cost)</th>
           <th>All-time (req / cost)</th>
           <th>Daily limits</th>
@@ -35,6 +36,24 @@
         </tr>
       </thead>
       <tbody id="users-body"></tbody>
+    </table>
+
+    <!-- Groups -->
+    <div class="topbar" style="margin-top:32px">
+      <h2 style="margin:0;font-size:18px">Groups &amp; departments</h2>
+      <button class="btn" id="new-group-btn">+ New group</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Members</th>
+          <th>Today (req / cost)</th>
+          <th>Shared daily limits</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="groups-body"></tbody>
     </table>
   </div>
 
@@ -69,6 +88,10 @@
           <input type="text" id="u-default-model" placeholder="e.g. gpt-4o-mini" />
         </div>
         <div class="field">
+          <label for="u-group">Group <span class="muted">(optional)</span></label>
+          <select id="u-group"><option value="">— none —</option></select>
+        </div>
+        <div class="field">
           <label for="u-req">Daily request limit <span class="muted">(blank = default)</span></label>
           <input type="number" id="u-req" min="0" step="1" />
         </div>
@@ -81,6 +104,33 @@
         </div>
         <div class="modal-actions">
           <button type="button" class="btn ghost" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Group modal (create / edit) -->
+  <div class="modal-backdrop hidden" id="group-modal">
+    <div class="modal">
+      <h2 id="group-modal-title">New group</h2>
+      <p class="error-msg" id="group-modal-error"></p>
+      <form id="group-form">
+        <input type="hidden" id="g-id" />
+        <div class="field">
+          <label for="g-name">Name</label>
+          <input type="text" id="g-name" required />
+        </div>
+        <div class="field">
+          <label for="g-req">Shared daily request limit <span class="muted">(blank = unlimited)</span></label>
+          <input type="number" id="g-req" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label for="g-cost">Shared daily cost limit USD <span class="muted">(blank = unlimited)</span></label>
+          <input type="number" id="g-cost" min="0" step="0.01" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="group-modal-cancel">Cancel</button>
           <button type="submit" class="btn">Save</button>
         </div>
       </form>

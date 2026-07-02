@@ -35,11 +35,9 @@ conversationsRouter.get('/conversations', (req, res) => {
 
 conversationsRouter.post('/conversations', (req, res) => {
   const { model, title, systemPrompt } = req.body || {};
-  const userDefault =
-    req.user.defaultModel && config.availableModels.includes(req.user.defaultModel)
-      ? req.user.defaultModel
-      : config.defaultModel;
-  const chosen = config.availableModels.includes(model) ? model : userDefault;
+  const chosen = config.availableModels.includes(model)
+    ? model
+    : users.effectiveDefaultModel(req.user);
   const conv = conversations.create(req.user.id, { model: chosen, title, systemPrompt });
   res.status(201).json(conv);
 });

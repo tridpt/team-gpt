@@ -93,13 +93,12 @@ authRouter.post('/logout', (req, res) => {
 authRouter.get('/me', (req, res) => {
   const user = loadUser(req);
   if (!user) return res.status(401).json({ error: 'Not authenticated.' });
-  const effectiveDefault =
-    user.defaultModel && config.availableModels.includes(user.defaultModel)
-      ? user.defaultModel
-      : config.defaultModel;
   res.json({
     user,
     budget: users.effectiveBudget(users.findById(user.id)),
-    config: { defaultModel: effectiveDefault, availableModels: config.availableModels },
+    config: {
+      defaultModel: users.effectiveDefaultModel(user),
+      availableModels: config.availableModels,
+    },
   });
 });

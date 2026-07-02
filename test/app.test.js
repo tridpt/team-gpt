@@ -258,6 +258,53 @@ test('conversation list paginates with limit/offset and hasMore', async () => {
   for (const id of created) await req(`/api/conversations/${id}`, { method: 'DELETE' });
 });
 
+test('admin can CRUD groups and assign users to them', async () => {
+  // Create a group with a shared budget.
+  const created = await req('/api/admin/groups', {
+    method: 'POST',
+    body: { name: 'Engineering', budget: { dailyRequests: 100, dailyCostUsd: 5 } },
+  });
+  assert.equal(created.status, 201);
+  const groupId = created.data.id;
+  assert.equal(created.data.name, 'Engineering');
+
+  // It shows up in the list.
+  const list = await req('/api/admin/groups');
+  assert.ok(list.data.groups.some((g) => g.id === groupId));
+
+  // Rename + change budget.
+  const patched = await req(`/api/admin/groups/${groupId}`, {
+    method: 'PATCH',
+    body: { name: 'Eng', budget: { dailyRequests: 50, dailyCostUsd: null } },
+  });
+  assert.equal(patched.data.name, 'Eng');
+  assert.equal(patched.data.budget.dailyRequests, 50);
+
+  // Assign a new member to the group.
+  const member = await req('/api/admin/users', {
+    method: 'POST',
+    body: { email: 'grouped@example.com', password: 'secret1', groupId },
+  });
+  assert.equal(member.status, 201);
+  assert.equal(member.data.groupId, groupId);
+
+  // Unknown group id is rejected.
+  const bad = await req('/api/admin/users', {
+    method: 'POST',
+    body: { email: 'nope@example.com', password: 'secret1', groupId: 'does-not-exist' },
+  });
+  assert.equal(bad.status, 400);
+
+  // Deleting the group clears it from its members.
+  const del = await req(`/api/admin/groups/${groupId}`, { method: 'DELETE' });
+  assert.equal(del.status, 200);
+  const after = await req(`/api/admin/users/${member.data.id}`);
+  assert.equal(after.data.user.groupId, null);
+
+  // Cleanup.
+  await req(`/api/admin/users/${member.data.id}`, { method: 'DELETE' });
+});
+
 test('logout clears the session', async () => {
   await req('/api/auth/logout', { method: 'POST' });
   cookie = ''; // server also cleared it; drop our copy
