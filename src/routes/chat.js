@@ -9,38 +9,19 @@ import { estimateMessagesTokens, estimateTokens, computeCost } from '../services
 export const chatRouter = express.Router();
 
 /**
- * Send a message in a conversation and stream the assistant's reply.
+ * Shared streaming core. Sends the conversation's context to the gateway and
+ * streams the reply back as Server-Sent Events, then persists the assistant
+ * message and records usage. Assumes `conv` already ends on the user turn.
  *
- * Response is Server-Sent Events:
+ * SSE frames:
  *   data: {"type":"delta","text":"..."}        (repeated)
  *   data: {"type":"done","usage":{...},"costUsd":n,"conversationId":id}
  *   data: [DONE]
  */
-chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => {
-  const userId = req.user.id;
-  const { content } = req.body || {};
+async function streamReply(req, res, userId, conv) {
+  const contextMessages = conversations.contextMessages(conv);
+  const model = conv.model;
 
-  if (!content || typeof content !== 'string' || !content.trim()) {
-    return res.status(400).json({ error: 'Message content is required.' });
-  }
-
-  const conv = conversations.get(userId, req.params.id);
-  if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
-
-  // ── Budget check (per-user, per-day) ──
-  const limits = users.effectiveBudget(users.findById(userId));
-  const budget = usage.checkBudget(userId, limits);
-  if (!budget.allowed) {
-    return res.status(429).json({ error: budget.reason, usage: budget.usage, limits });
-  }
-
-  // Persist the user's message, then build the context to send upstream.
-  conversations.addMessage(userId, conv.id, { role: 'user', content: content.trim() });
-  const fresh = conversations.get(userId, conv.id);
-  const contextMessages = conversations.contextMessages(fresh);
-  const model = fresh.model;
-
-  // ── Open the SSE stream to the browser ──
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -54,8 +35,12 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
   const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000);
   const cleanup = () => clearInterval(heartbeat);
 
-  req.on('close', () => {
-    controller.abort();
+  res.on('close', () => {
+    // Fires when the connection closes. If the response hasn't finished, the
+    // client disconnected mid-stream — abort the upstream call so we don't keep
+    // generating a reply nobody will read. (Listening on `req` would fire as
+    // soon as the request body is consumed, aborting immediately.)
+    if (!res.writableEnded) controller.abort();
     cleanup();
   });
 
@@ -65,7 +50,6 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
       (delta) => send({ type: 'delta', text: delta })
     );
 
-    // Persist the assistant reply.
     conversations.addMessage(userId, conv.id, { role: 'assistant', content: fullText });
 
     // Estimate usage (the upstream stream doesn't return token counts).
@@ -74,12 +58,7 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
     const costUsd = computeCost(model, inputTokens, outputTokens);
     usage.record(userId, { inputTokens, outputTokens, costUsd });
 
-    send({
-      type: 'done',
-      conversationId: conv.id,
-      usage: { inputTokens, outputTokens },
-      costUsd,
-    });
+    send({ type: 'done', conversationId: conv.id, usage: { inputTokens, outputTokens }, costUsd });
     res.write('data: [DONE]\n\n');
     cleanup();
     res.end();
@@ -97,4 +76,52 @@ chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => 
       res.end();
     }
   }
+}
+
+function budgetGuard(req, res) {
+  const limits = users.effectiveBudget(users.findById(req.user.id));
+  const budget = usage.checkBudget(req.user.id, limits);
+  if (!budget.allowed) {
+    res.status(429).json({ error: budget.reason, usage: budget.usage, limits });
+    return false;
+  }
+  return true;
+}
+
+/** Send a new message in a conversation and stream the assistant's reply. */
+chatRouter.post('/conversations/:id/messages', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { content } = req.body || {};
+
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return res.status(400).json({ error: 'Message content is required.' });
+  }
+
+  const conv = conversations.get(userId, req.params.id);
+  if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
+
+  if (!budgetGuard(req, res)) return;
+
+  conversations.addMessage(userId, conv.id, { role: 'user', content: content.trim() });
+  const fresh = conversations.get(userId, conv.id);
+  await streamReply(req, res, userId, fresh);
+});
+
+/**
+ * Regenerate the last assistant reply. With an optional `content` field it
+ * edits the last user message before regenerating (edit-and-resend).
+ */
+chatRouter.post('/conversations/:id/regenerate', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { content } = req.body || {};
+
+  const exists = conversations.get(userId, req.params.id);
+  if (!exists) return res.status(404).json({ error: 'Conversation not found.' });
+
+  if (!budgetGuard(req, res)) return;
+
+  const conv = conversations.prepareRegenerate(userId, req.params.id, content);
+  if (!conv) return res.status(400).json({ error: 'Nothing to regenerate.' });
+
+  await streamReply(req, res, userId, conv);
 });

@@ -10,18 +10,23 @@ export const conversationsRouter = express.Router();
 conversationsRouter.use(requireAuth);
 
 // List the current user's conversations + their live budget/usage.
+// Optional ?q= filters by title/content.
 conversationsRouter.get('/conversations', (req, res) => {
+  const q = req.query.q;
+  const list = q
+    ? conversations.searchForUser(req.user.id, q)
+    : conversations.listForUser(req.user.id);
   res.json({
-    conversations: conversations.listForUser(req.user.id),
+    conversations: list,
     usage: usage.getTodayUsage(req.user.id),
     limits: users.effectiveBudget(users.findById(req.user.id)),
   });
 });
 
 conversationsRouter.post('/conversations', (req, res) => {
-  const { model, title } = req.body || {};
+  const { model, title, systemPrompt } = req.body || {};
   const chosen = config.availableModels.includes(model) ? model : config.defaultModel;
-  const conv = conversations.create(req.user.id, { model: chosen, title });
+  const conv = conversations.create(req.user.id, { model: chosen, title, systemPrompt });
   res.status(201).json(conv);
 });
 
@@ -32,28 +37,20 @@ conversationsRouter.get('/conversations/:id', (req, res) => {
 });
 
 conversationsRouter.patch('/conversations/:id', (req, res) => {
-  const { title, model } = req.body || {};
+  const { title, model, systemPrompt } = req.body || {};
+  const id = req.params.id;
 
-  // Update the model if a valid one was provided.
-  if (model !== undefined) {
-    if (!config.availableModels.includes(model)) {
-      return res.status(400).json({ error: 'Unknown model.' });
-    }
-    const updated = conversations.setModel(req.user.id, req.params.id, model);
-    if (!updated) return res.status(404).json({ error: 'Conversation not found.' });
-    if (title === undefined) return res.json(updated);
+  if (model !== undefined && !config.availableModels.includes(model)) {
+    return res.status(400).json({ error: 'Unknown model.' });
   }
 
-  // Update the title if provided.
-  if (title !== undefined) {
-    const conv = conversations.rename(req.user.id, req.params.id, title);
-    if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
-    return res.json(conv);
-  }
-
-  // Nothing to change: return the current conversation.
-  const conv = conversations.get(req.user.id, req.params.id);
+  let conv = conversations.get(req.user.id, id);
   if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
+
+  if (model !== undefined) conv = conversations.setModel(req.user.id, id, model);
+  if (systemPrompt !== undefined) conv = conversations.setSystemPrompt(req.user.id, id, systemPrompt);
+  if (title !== undefined) conv = conversations.rename(req.user.id, id, title);
+
   res.json(conv);
 });
 

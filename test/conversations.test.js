@@ -8,6 +8,9 @@ import {
   contextMessages,
   rename,
   setModel,
+  setSystemPrompt,
+  searchForUser,
+  prepareRegenerate,
   remove,
 } from '../src/services/conversations.js';
 
@@ -74,6 +77,65 @@ test('setModel changes the model and enforces ownership', () => {
   const updated = setModel('modeler', c.id, 'gpt-4o-mini');
   assert.equal(updated.model, 'gpt-4o-mini');
   assert.equal(get('modeler', c.id).model, 'gpt-4o-mini');
+});
+
+test('a system prompt is prepended to the context', () => {
+  const c = create('sp', { systemPrompt: 'Be terse.' });
+  addMessage('sp', c.id, { role: 'user', content: 'hi' });
+  const ctx = contextMessages(get('sp', c.id));
+  assert.equal(ctx[0].role, 'system');
+  assert.equal(ctx[0].content, 'Be terse.');
+  assert.equal(ctx[1].role, 'user');
+});
+
+test('setSystemPrompt updates and can clear the prompt', () => {
+  const c = create('sp2', {});
+  setSystemPrompt('sp2', c.id, 'Answer in French.');
+  assert.equal(get('sp2', c.id).systemPrompt, 'Answer in French.');
+  setSystemPrompt('sp2', c.id, '');
+  assert.equal(get('sp2', c.id).systemPrompt, '');
+  // Cleared prompt is not prepended.
+  addMessage('sp2', c.id, { role: 'user', content: 'hi' });
+  assert.equal(contextMessages(get('sp2', c.id))[0].role, 'user');
+});
+
+test('searchForUser matches title and message content', () => {
+  const a = create('searcher', { title: 'Deploy pipeline' }); // no messages → title kept
+  const b = create('searcher', { title: 'Grocery list' });
+  addMessage('searcher', b.id, { role: 'user', content: 'kubernetes rollout' });
+
+  const byTitle = searchForUser('searcher', 'deploy');
+  assert.ok(byTitle.some((c) => c.id === a.id));
+  assert.ok(!byTitle.some((c) => c.id === b.id));
+
+  const byContent = searchForUser('searcher', 'kubernetes');
+  assert.ok(byContent.some((c) => c.id === b.id));
+
+  // Empty query returns the full list.
+  assert.equal(searchForUser('searcher', '').length, listForUser('searcher').length);
+});
+
+test('prepareRegenerate drops trailing assistant and can edit the last prompt', () => {
+  const c = create('regen', {});
+  addMessage('regen', c.id, { role: 'user', content: 'first' });
+  addMessage('regen', c.id, { role: 'assistant', content: 'reply' });
+
+  // Plain regenerate: assistant removed, ends on the user message.
+  const prepared = prepareRegenerate('regen', c.id, undefined);
+  assert.equal(prepared.messages.length, 1);
+  assert.equal(prepared.messages[0].role, 'user');
+  assert.equal(prepared.messages[0].content, 'first');
+
+  // Edit-and-resend rewrites the last user message.
+  addMessage('regen', c.id, { role: 'assistant', content: 'reply2' });
+  const edited = prepareRegenerate('regen', c.id, 'first (edited)');
+  assert.equal(edited.messages.length, 1);
+  assert.equal(edited.messages[0].content, 'first (edited)');
+});
+
+test('prepareRegenerate returns null when there is no user message', () => {
+  const c = create('regen-empty', {});
+  assert.equal(prepareRegenerate('regen-empty', c.id, undefined), null);
 });
 
 test('rename and remove enforce ownership', () => {

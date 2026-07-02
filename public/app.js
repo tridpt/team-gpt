@@ -12,12 +12,46 @@ function escapeHtml(s) {
   );
 }
 
+/* Lightweight, language-agnostic syntax highlighter. Tokenizes raw code and
+ * escapes each piece, so it's XSS-safe. Not a full parser — just colors
+ * comments, strings, numbers, and common keywords. */
+const CODE_KEYWORDS = new Set([
+  'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
+  'switch', 'case', 'break', 'continue', 'new', 'class', 'extends', 'super', 'this',
+  'import', 'export', 'from', 'default', 'async', 'await', 'yield', 'try', 'catch',
+  'finally', 'throw', 'typeof', 'instanceof', 'in', 'of', 'void', 'delete', 'null',
+  'undefined', 'true', 'false', 'def', 'elif', 'lambda', 'None', 'True', 'False',
+  'and', 'or', 'not', 'pass', 'with', 'as', 'public', 'private', 'protected', 'static',
+  'int', 'float', 'string', 'bool', 'boolean', 'void', 'struct', 'enum', 'interface',
+  'type', 'func', 'package', 'select', 'insert', 'update', 'delete', 'where',
+]);
+
+function highlightCode(code) {
+  const pattern =
+    /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d[\w.]*\b)|([A-Za-z_$][\w$]*)/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = pattern.exec(code))) {
+    out += escapeHtml(code.slice(last, m.index));
+    const [full, comment, str, num, word] = m;
+    if (comment) out += `<span class="tok-com">${escapeHtml(comment)}</span>`;
+    else if (str) out += `<span class="tok-str">${escapeHtml(str)}</span>`;
+    else if (num) out += `<span class="tok-num">${escapeHtml(num)}</span>`;
+    else if (word && CODE_KEYWORDS.has(word)) out += `<span class="tok-kw">${escapeHtml(word)}</span>`;
+    else out += escapeHtml(full);
+    last = m.index + full.length;
+  }
+  out += escapeHtml(code.slice(last));
+  return out;
+}
+
 function renderMarkdown(src) {
   const codeBlocks = [];
   // 1) Protect fenced code blocks so their content isn't further formatted.
   let text = String(src).replace(/```[ \t]*[\w+-]*\n?([\s\S]*?)```/g, (m, code) => {
     const i = codeBlocks.length;
-    codeBlocks.push(`<pre><code>${escapeHtml(code.replace(/\n+$/, ''))}</code></pre>`);
+    codeBlocks.push(`<pre><code>${highlightCode(code.replace(/\n+$/, ''))}</code></pre>`);
     return `\u0000CB${i}\u0000`;
   });
 
@@ -80,6 +114,7 @@ const state = {
   config: { defaultModel: '', availableModels: [] },
   conversations: [],
   activeId: null,
+  activeConv: null,
   limits: { dailyRequests: null, dailyCostUsd: null },
   usage: { requests: 0, costUsd: 0 },
   sending: false,
@@ -197,19 +232,29 @@ function populateModels() {
 }
 
 /* ── Conversations list ── */
-async function loadConversations() {
-  const data = await api('/api/conversations');
+async function loadConversations(q = '') {
+  const url = q ? `/api/conversations?q=${encodeURIComponent(q)}` : '/api/conversations';
+  const data = await api(url);
   state.conversations = data.conversations;
   state.limits = data.limits || state.limits;
   state.usage = data.usage || state.usage;
   renderConversations();
   renderBudget();
-  if (!state.activeId && state.conversations.length) {
-    openConversation(state.conversations[0].id);
-  } else if (!state.conversations.length) {
-    renderEmptyState();
+  if (!q) {
+    if (!state.activeId && state.conversations.length) {
+      openConversation(state.conversations[0].id);
+    } else if (!state.conversations.length) {
+      renderEmptyState();
+    }
   }
 }
+
+let searchTimer = null;
+$('#conv-search').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  searchTimer = setTimeout(() => loadConversations(q), 200);
+});
 
 function renderConversations() {
   const list = $('#conv-list');
@@ -256,6 +301,7 @@ async function deleteConversation(id) {
   state.conversations = state.conversations.filter((c) => c.id !== id);
   if (state.activeId === id) {
     state.activeId = null;
+    state.activeConv = null;
     if (state.conversations.length) openConversation(state.conversations[0].id);
     else renderEmptyState();
   }
@@ -269,9 +315,11 @@ async function openConversation(id) {
   state.activeId = id;
   renderConversations();
   const conv = await api(`/api/conversations/${id}`);
+  state.activeConv = conv;
   const sel = $('#model-select');
   if ([...sel.options].some((o) => o.value === conv.model)) sel.value = conv.model;
   renderMessages(conv.messages);
+  renderMessageActions();
 }
 
 function renderEmptyState() {
@@ -326,7 +374,7 @@ function scrollToBottom() {
   box.scrollTop = box.scrollHeight;
 }
 
-/* ── Sending a message (SSE stream) ── */
+/* ── Sending / streaming ── */
 async function sendMessage() {
   const input = $('#input');
   const content = input.value.trim();
@@ -338,22 +386,59 @@ async function sendMessage() {
   }
   const convId = state.activeId;
 
+  input.value = '';
+  autoGrow(input);
+  document.getElementById('msg-actions')?.remove();
+  appendMessage('user', content);
+
   const ac = new AbortController();
   state.abort = ac;
   setSending(true);
-  input.value = '';
-  autoGrow(input);
-
-  appendMessage('user', content);
   const assistantEl = appendMessage('assistant', '');
   assistantEl.classList.add('streaming');
   scrollToBottom();
 
+  await runStream(`/api/conversations/${convId}/messages`, { content }, assistantEl, ac);
+}
+
+/** Regenerate the last reply; pass newContent to edit-and-resend the prompt. */
+async function regenerate(newContent) {
+  if (state.sending || !state.activeId) return;
+  document.getElementById('msg-actions')?.remove();
+
+  // Match the DOM to what the server will do: drop the trailing assistant
+  // bubble (being replaced) and, if editing, update the last user bubble.
+  lastMessageWrap('assistant')?.remove();
+  if (newContent != null) {
+    const u = lastMessageWrap('user');
+    if (u) u.querySelector('.content').textContent = newContent;
+  }
+
+  const ac = new AbortController();
+  state.abort = ac;
+  setSending(true);
+  const assistantEl = appendMessage('assistant', '');
+  assistantEl.classList.add('streaming');
+  scrollToBottom();
+
+  const body = newContent != null ? { content: newContent } : {};
+  await runStream(`/api/conversations/${state.activeId}/regenerate`, body, assistantEl, ac);
+}
+
+function editLast(currentContent) {
+  const edited = prompt('Edit your message:', currentContent);
+  if (edited == null) return;
+  const trimmed = edited.trim();
+  if (trimmed) regenerate(trimmed);
+}
+
+/** Read an SSE stream into an assistant bubble. Shared by send & regenerate. */
+async function runStream(url, body, assistantEl, ac) {
   try {
-    const res = await fetch(`/api/conversations/${convId}/messages`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
       signal: ac.signal,
     });
 
@@ -394,7 +479,7 @@ async function sendMessage() {
             assistantEl.innerHTML = renderMarkdown(text);
             scrollToBottom();
           } else if (evt.type === 'done') {
-            onMessageDone(convId, evt);
+            await onMessageDone(evt);
           } else if (evt.type === 'error') {
             assistantEl.textContent = `⚠ ${evt.error}`;
             assistantEl.classList.add('error-msg');
@@ -404,7 +489,6 @@ async function sendMessage() {
     }
   } catch (err) {
     if (err.name === 'AbortError') {
-      // User pressed Stop; keep whatever streamed so far.
       if (!assistantEl.textContent.trim()) {
         assistantEl.textContent = '(stopped)';
         assistantEl.classList.add('muted');
@@ -417,16 +501,61 @@ async function sendMessage() {
     assistantEl.classList.remove('streaming');
     state.abort = null;
     setSending(false);
-    input.focus();
+    $('#input').focus();
   }
 }
 
-function onMessageDone(convId, evt) {
+async function onMessageDone(evt) {
   // Bump usage locally and refresh the sidebar / titles.
   state.usage.requests = (state.usage.requests || 0) + 1;
   state.usage.costUsd = (state.usage.costUsd || 0) + (evt.costUsd || 0);
   renderBudget();
-  loadConversations();
+  await loadConversations();
+  // Refresh the open conversation so export/regenerate see the latest messages.
+  if (state.activeId) {
+    try {
+      state.activeConv = await api(`/api/conversations/${state.activeId}`);
+    } catch {
+      /* ignore */
+    }
+  }
+  renderMessageActions();
+}
+
+/** Find the DOM wrapper of the last message with the given role. */
+function lastMessageWrap(role) {
+  const wraps = $('#messages').querySelectorAll('.msg-wrap');
+  for (let i = wraps.length - 1; i >= 0; i--) {
+    if (wraps[i].querySelector(`.msg.${role}`)) return wraps[i];
+  }
+  return null;
+}
+
+/** Show a Regenerate / Edit toolbar under the thread (idle, with history). */
+function renderMessageActions() {
+  document.getElementById('msg-actions')?.remove();
+  const conv = state.activeConv;
+  if (state.sending || !conv || !conv.messages || !conv.messages.length) return;
+
+  const lastUser = [...conv.messages].reverse().find((m) => m.role === 'user');
+  if (!lastUser) return;
+
+  const bar = document.createElement('div');
+  bar.id = 'msg-actions';
+  bar.className = 'msg-wrap msg-actions';
+
+  const regen = document.createElement('button');
+  regen.className = 'btn ghost';
+  regen.textContent = '↻ Regenerate';
+  regen.addEventListener('click', () => regenerate());
+
+  const edit = document.createElement('button');
+  edit.className = 'btn ghost';
+  edit.textContent = '✎ Edit last';
+  edit.addEventListener('click', () => editLast(lastUser.content));
+
+  bar.append(regen, edit);
+  $('#messages').appendChild(bar);
 }
 
 function setSending(sending) {
@@ -464,6 +593,64 @@ $('#model-select').addEventListener('change', async () => {
     const c = state.conversations.find((x) => x.id === state.activeId);
     if (c) c.model = model;
     $('#model-hint').textContent = 'Model updated';
+    setTimeout(() => { $('#model-hint').textContent = ''; }, 1500);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+/* ── Export & system prompt ── */
+function downloadFile(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportConversation(format) {
+  const conv = state.activeConv;
+  if (!conv) {
+    alert('Open a conversation first.');
+    return;
+  }
+  const base = (conv.title || 'chat').replace(/[^\w\-]+/g, '_').slice(0, 40) || 'chat';
+
+  if (format === 'json') {
+    downloadFile(`${base}.json`, JSON.stringify(conv, null, 2), 'application/json');
+    return;
+  }
+
+  const lines = [`# ${conv.title || 'Conversation'}`, '', `- Model: ${conv.model}`, `- Created: ${conv.createdAt}`];
+  if (conv.systemPrompt) lines.push('', '## System', '', conv.systemPrompt);
+  for (const m of conv.messages) {
+    lines.push('', `## ${m.role === 'user' ? 'User' : 'Assistant'}`, '', m.content);
+  }
+  downloadFile(`${base}.md`, lines.join('\n'), 'text/markdown');
+}
+
+$('#export-md').addEventListener('click', () => exportConversation('md'));
+$('#export-json').addEventListener('click', () => exportConversation('json'));
+
+$('#system-btn').addEventListener('click', async () => {
+  if (!state.activeId) {
+    alert('Open or start a conversation first.');
+    return;
+  }
+  const current = state.activeConv?.systemPrompt || '';
+  const next = prompt('System prompt (instructions for the assistant). Leave blank to clear:', current);
+  if (next == null) return;
+  try {
+    const conv = await api(`/api/conversations/${state.activeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ systemPrompt: next }),
+    });
+    if (state.activeConv) state.activeConv.systemPrompt = conv.systemPrompt;
+    $('#model-hint').textContent = next.trim() ? 'System prompt set' : 'System prompt cleared';
     setTimeout(() => { $('#model-hint').textContent = ''; }, 1500);
   } catch (err) {
     alert(err.message);

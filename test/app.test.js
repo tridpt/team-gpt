@@ -100,6 +100,43 @@ test('PATCH can change a conversation model and rejects unknown ones', async () 
   await req(`/api/conversations/${id}`, { method: 'DELETE' });
 });
 
+test('PATCH sets a system prompt and it persists', async () => {
+  const created = await req('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
+  const id = created.data.id;
+
+  const patched = await req(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: { systemPrompt: 'Answer briefly.' },
+  });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.data.systemPrompt, 'Answer briefly.');
+
+  const fetched = await req(`/api/conversations/${id}`);
+  assert.equal(fetched.data.systemPrompt, 'Answer briefly.');
+
+  await req(`/api/conversations/${id}`, { method: 'DELETE' });
+});
+
+test('conversation search filters by title', async () => {
+  const a = await req('/api/conversations', { method: 'POST', body: { title: 'Zebra safari notes' } });
+  const b = await req('/api/conversations', { method: 'POST', body: { title: 'Tax paperwork' } });
+
+  const found = await req('/api/conversations?q=zebra');
+  assert.ok(found.data.conversations.some((c) => c.id === a.data.id));
+  assert.ok(!found.data.conversations.some((c) => c.id === b.data.id));
+
+  await req(`/api/conversations/${a.data.id}`, { method: 'DELETE' });
+  await req(`/api/conversations/${b.data.id}`, { method: 'DELETE' });
+});
+
+test('regenerate returns 400 when there is nothing to regenerate', async () => {
+  const created = await req('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
+  const r = await req(`/api/conversations/${created.data.id}/regenerate`, { method: 'POST', body: {} });
+  assert.equal(r.status, 400);
+  assert.match(r.data.error, /nothing to regenerate/i);
+  await req(`/api/conversations/${created.data.id}`, { method: 'DELETE' });
+});
+
 test('admin can create, list, and delete a member', async () => {
   const create = await req('/api/admin/users', {
     method: 'POST',

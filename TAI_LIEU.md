@@ -299,7 +299,7 @@ tới lúc chữ hiện trên màn hình.
     yêu cầu trả về dạng stream.
 12. Mỗi khi gateway trả về một mẩu chữ (delta), server **đẩy ngay** xuống trình
     duyệt: `data: {"type":"delta","text":"..."}`.
-13. Nếu bạn **đóng tab giữa chừng**, server phát hiện (`req.on('close')`) và
+13. Nếu bạn **đóng tab giữa chừng**, server phát hiện (`res.on('close')`) và
     **hủy** request tới gateway (`AbortController`) — không phí token cho câu trả
     lời không ai đọc.
 
@@ -446,7 +446,7 @@ hoặc một khối chứa nhiều frame. Cả server (`gateway.js`) lẫn clien
   ngắt kết nối khi câu trả lời lâu. Dòng bắt đầu bằng `:` là comment SSE, client
   bỏ qua.
 - Nút **Stop** ở UI dùng `AbortController` phía trình duyệt để hủy request →
-  server phát hiện kết nối đóng (`req.on('close')`) và hủy luôn request tới
+  server phát hiện kết nối đóng (`res.on('close')`) và hủy luôn request tới
   gateway. Phần chữ đã stream vẫn giữ trên màn hình, nhưng **không** được lưu vào
   lịch sử (câu trả lời dở không tính usage).
 
@@ -586,12 +586,13 @@ Xác thực bằng cookie `tg_session` (được đặt khi đăng nhập). Thâ
 
 | Method | Path | Thân gửi | Trả về |
 | --- | --- | --- | --- |
-| `GET` | `/api/conversations` | — | `{ conversations, usage, limits }` |
-| `POST` | `/api/conversations` | `{ model, title }` | Hội thoại vừa tạo (`201`). Model lạ → về mặc định. |
+| `GET` | `/api/conversations` | — (tùy chọn `?q=`) | `{ conversations, usage, limits }`. `?q=` lọc theo tiêu đề/nội dung. |
+| `POST` | `/api/conversations` | `{ model, title, systemPrompt }` | Hội thoại vừa tạo (`201`). Model lạ → về mặc định. |
 | `GET` | `/api/conversations/:id` | — | Hội thoại đầy đủ (kèm messages). `404` nếu không phải của bạn. |
-| `PATCH` | `/api/conversations/:id` | `{ title }` và/hoặc `{ model }` | Đổi tên và/hoặc đổi model (model phải thuộc `AVAILABLE_MODELS`, ngược lại `400`). |
+| `PATCH` | `/api/conversations/:id` | `{ title }`, `{ model }`, `{ systemPrompt }` | Đổi tên / đổi model / đặt system prompt (model phải thuộc `AVAILABLE_MODELS`, ngược lại `400`). |
 | `DELETE` | `/api/conversations/:id` | — | `{ ok: true }` |
 | `POST` | `/api/conversations/:id/messages` | `{ content }` | **Luồng SSE** (xem dưới). `429` nếu vượt hạn mức. |
+| `POST` | `/api/conversations/:id/regenerate` | `{ content }` (tùy chọn) | Tạo lại câu trả lời cuối; kèm `content` thì sửa lại tin user cuối trước. **Luồng SSE**. `400` nếu không có gì để tạo lại. |
 
 **Luồng SSE của endpoint gửi tin:**
 ```

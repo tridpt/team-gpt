@@ -18,8 +18,11 @@ Browser ──▶ TeamGPT (auth, users, budgets, history) ──▶ LLM gateway 
   (httpOnly cookies, scrypt-hashed passwords — no external auth dependency).
 - **Streaming chat** over Server-Sent Events, with saved per-user conversation
   history and automatic titles. Assistant replies render **Markdown** (code
-  blocks, lists, links…) and generation can be interrupted with a **Stop**
-  button. The model can be switched mid-conversation.
+  blocks with light syntax highlighting, lists, links…) and generation can be
+  interrupted with a **Stop** button. The model can be switched mid-conversation.
+- **Conversation tools**: search by title/content, a per-conversation **system
+  prompt**, **regenerate** / edit-and-resend the last message, and **export** a
+  thread to Markdown or JSON.
 - **Per-user daily budgets** — cap requests/day and cost/day, reset at midnight
   UTC. Usage is estimated locally for fairness (the gateway remains the source
   of truth for real spend).
@@ -116,12 +119,13 @@ Auth uses a `tg_session` httpOnly cookie set on login.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/conversations` | List conversations + today's usage/limits. |
-| `POST` | `/api/conversations` | Create a conversation `{ model, title }`. |
+| `GET` | `/api/conversations` | List conversations + today's usage/limits. Optional `?q=` filters by title/content. |
+| `POST` | `/api/conversations` | Create a conversation `{ model, title, systemPrompt }`. |
 | `GET` | `/api/conversations/:id` | Full conversation with messages. |
-| `PATCH` | `/api/conversations/:id` | Rename `{ title }` and/or switch `{ model }`. |
+| `PATCH` | `/api/conversations/:id` | Update `{ title }`, `{ model }`, and/or `{ systemPrompt }`. |
 | `DELETE` | `/api/conversations/:id` | Delete a conversation. |
 | `POST` | `/api/conversations/:id/messages` | Send `{ content }`; streams the reply as SSE. |
+| `POST` | `/api/conversations/:id/regenerate` | Regenerate the last reply; optional `{ content }` edits the last prompt first. Streams SSE. |
 
 The message stream emits:
 

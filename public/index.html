@@ -32,6 +32,7 @@
       <div class="sidebar-head">
         <div class="brand"><span class="dot"></span> TeamGPT</div>
         <button class="btn new-chat" id="new-chat-btn">+ New chat</button>
+        <input type="search" id="conv-search" class="conv-search" placeholder="Search chats…" />
       </div>
       <div class="conv-list" id="conv-list"></div>
       <div class="sidebar-foot">
@@ -52,8 +53,15 @@
 
     <main class="main">
       <div class="main-head">
-        <select id="model-select"></select>
-        <span class="muted" id="model-hint"></span>
+        <div class="head-left">
+          <select id="model-select"></select>
+          <span class="muted" id="model-hint"></span>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="system-btn" title="Set a system prompt">System</button>
+          <button class="btn ghost" id="export-md" title="Export as Markdown">⬇ MD</button>
+          <button class="btn ghost" id="export-json" title="Export as JSON">⬇ JSON</button>
+        </div>
       </div>
       <div class="messages" id="messages"></div>
       <div class="composer">
