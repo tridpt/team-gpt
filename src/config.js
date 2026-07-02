@@ -51,6 +51,9 @@ const optNum = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+const bool = (v, fallback = false) =>
+  v === undefined || v === '' ? fallback : /^(1|true|yes|on)$/i.test(String(v));
+
 export const config = {
   rootDir,
   port: int(process.env.PORT, 4000),
@@ -60,6 +63,16 @@ export const config = {
   gateway: {
     url: (process.env.GATEWAY_URL || 'http://localhost:8080').replace(/\/+$/, ''),
     apiKey: process.env.GATEWAY_API_KEY || '',
+  },
+
+  // Send the session cookie only over HTTPS. Enable in production (behind TLS).
+  cookieSecure: bool(process.env.COOKIE_SECURE, false),
+
+  // Brute-force protection for the login endpoint.
+  loginLimit: {
+    maxAttempts: int(process.env.LOGIN_MAX_ATTEMPTS, 5),
+    windowMs: int(process.env.LOGIN_WINDOW_MINUTES, 15) * 60 * 1000,
+    lockoutMs: int(process.env.LOGIN_LOCKOUT_MINUTES, 15) * 60 * 1000,
   },
 
   defaultModel: process.env.DEFAULT_MODEL || 'gpt-4o-mini',

@@ -87,6 +87,28 @@ $('#logout-link').addEventListener('click', async (e) => {
   showLogin();
 });
 
+$('#change-pw-link').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const currentPassword = prompt('Current password:');
+  if (!currentPassword) return;
+  const newPassword = prompt('New password (min 6 characters):');
+  if (!newPassword) return;
+  const confirmPassword = prompt('Confirm new password:');
+  if (newPassword !== confirmPassword) {
+    alert('New passwords do not match.');
+    return;
+  }
+  try {
+    await api('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    alert('Password changed.');
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
 /* ── Models ── */
 function populateModels() {
   const sel = $('#model-select');

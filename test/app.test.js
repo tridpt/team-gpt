@@ -115,6 +115,56 @@ test('admin cannot delete their own account', async () => {
   assert.equal(r.status, 400);
 });
 
+test('change-password rejects a wrong current password', async () => {
+  const r = await req('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword: 'not-it', newPassword: 'brandnew1' },
+  });
+  assert.equal(r.status, 400);
+  assert.match(r.data.error, /current password/i);
+});
+
+test('change-password rejects a too-short new password', async () => {
+  const r = await req('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword: 'change-me-now', newPassword: '123' },
+  });
+  assert.equal(r.status, 400);
+});
+
+test('change-password succeeds and keeps the session valid', async () => {
+  const change = await req('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword: 'change-me-now', newPassword: 'brandnew1' },
+  });
+  assert.equal(change.status, 200);
+  assert.equal(change.data.ok, true);
+
+  // Fresh cookie was issued; the current session still works.
+  const me = await req('/api/auth/me');
+  assert.equal(me.status, 200);
+
+  // Restore the original password so other assumptions hold.
+  const back = await req('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword: 'brandnew1', newPassword: 'change-me-now' },
+  });
+  assert.equal(back.status, 200);
+});
+
+test('login locks out after too many failed attempts', async () => {
+  // Use a distinct email so we do not lock the admin key used by other tests.
+  const bad = { email: 'lockme@example.com', password: 'wrong' };
+  let last;
+  for (let i = 0; i < 5; i++) {
+    last = await req('/api/auth/login', { method: 'POST', auth: false, body: bad });
+    assert.equal(last.status, 401);
+  }
+  const locked = await req('/api/auth/login', { method: 'POST', auth: false, body: bad });
+  assert.equal(locked.status, 429);
+  assert.match(locked.data.error, /too many/i);
+});
+
 test('logout clears the session', async () => {
   await req('/api/auth/logout', { method: 'POST' });
   cookie = ''; // server also cleared it; drop our copy

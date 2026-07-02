@@ -58,6 +58,10 @@ All configuration is via environment variables (loaded from `.env` if present).
 | `PORT` | `4000` | HTTP port. |
 | `DATA_DIR` | `./data` | Directory for JSON data (users, sessions, conversations, usage). |
 | `SESSION_TTL_HOURS` | `168` | Session lifetime in hours. |
+| `COOKIE_SECURE` | `false` | Send the session cookie only over HTTPS (enable in production). |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed logins per IP+email before a temporary lockout. |
+| `LOGIN_WINDOW_MINUTES` | `15` | Window in which failed attempts are counted. |
+| `LOGIN_LOCKOUT_MINUTES` | `15` | How long a key stays locked after hitting the limit. |
 | `GATEWAY_URL` | `http://localhost:8080` | Base URL of the upstream LLM gateway. |
 | `GATEWAY_API_KEY` | — | Shared key TeamGPT uses to call the gateway. |
 | `DEFAULT_MODEL` | `gpt-4o-mini` | Model selected by default in the UI. |
@@ -80,6 +84,7 @@ Auth uses a `tg_session` httpOnly cookie set on login.
 | --- | --- | --- |
 | `POST` | `/api/auth/login` | `{ email, password }` → sets session cookie. |
 | `POST` | `/api/auth/logout` | Clears the session. |
+| `POST` | `/api/auth/change-password` | `{ currentPassword, newPassword }` — self-service password change. |
 | `GET` | `/api/auth/me` | Current user, effective budget, and UI config. |
 
 ### Conversations (member)
@@ -160,7 +165,11 @@ the JSON stores at a throwaway temp directory, so tests never touch your real
 - Passwords are hashed with scrypt; sessions are random 256-bit tokens stored
   server-side and sent as httpOnly cookies.
 - Put TeamGPT behind HTTPS in production so session cookies aren't sent in the
-  clear.
+  clear. Set `COOKIE_SECURE=true` so the cookie carries the `Secure` flag.
+- The login endpoint is rate-limited per IP+email: after `LOGIN_MAX_ATTEMPTS`
+  failures it locks that key for `LOGIN_LOCKOUT_MINUTES` (brute-force defense).
+- Members can change their own password via `POST /api/auth/change-password`;
+  doing so invalidates sessions on other devices.
 - The `GATEWAY_API_KEY` grants access to the gateway — treat it as a secret and
   keep `.env` out of version control (it already is via `.gitignore`).
 
