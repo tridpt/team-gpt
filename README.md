@@ -86,23 +86,23 @@ docker run -p 4000:4000 -e GATEWAY_URL=http://your-gateway:8080 \
 
 All configuration is via environment variables (loaded from `.env` if present).
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `4000` | HTTP port. |
-| `DATA_DIR` | `./data` | Directory for JSON data (users, sessions, conversations, usage). |
-| `SESSION_TTL_HOURS` | `168` | Session lifetime in hours. |
-| `COOKIE_SECURE` | `false` | Send the session cookie only over HTTPS (enable in production). |
-| `LOGIN_MAX_ATTEMPTS` | `5` | Failed logins per IP+email before a temporary lockout. |
-| `LOGIN_WINDOW_MINUTES` | `15` | Window in which failed attempts are counted. |
-| `LOGIN_LOCKOUT_MINUTES` | `15` | How long a key stays locked after hitting the limit. |
-| `GATEWAY_URL` | `http://localhost:8080` | Base URL of the upstream LLM gateway. |
-| `GATEWAY_API_KEY` | — | Shared key TeamGPT uses to call the gateway. |
-| `DEFAULT_MODEL` | `gpt-4o-mini` | Model selected by default in the UI. |
-| `AVAILABLE_MODELS` | `gpt-4o-mini,mock-gpt` | Comma-separated models users can pick. |
-| `ADMIN_EMAIL` | `admin@example.com` | Seed admin email (first boot only). |
-| `ADMIN_PASSWORD` | `change-me-now` | Seed admin password (first boot only). |
-| `DEFAULT_DAILY_REQUESTS` | — | Default per-user daily request cap (blank = unlimited). |
-| `DEFAULT_DAILY_COST_USD` | — | Default per-user daily cost cap (blank = unlimited). |
+| Variable                 | Default                 | Description                                                      |
+| ------------------------ | ----------------------- | ---------------------------------------------------------------- |
+| `PORT`                   | `4000`                  | HTTP port.                                                       |
+| `DATA_DIR`               | `./data`                | Directory for JSON data (users, sessions, conversations, usage). |
+| `SESSION_TTL_HOURS`      | `168`                   | Session lifetime in hours.                                       |
+| `COOKIE_SECURE`          | `false`                 | Send the session cookie only over HTTPS (enable in production).  |
+| `LOGIN_MAX_ATTEMPTS`     | `5`                     | Failed logins per IP+email before a temporary lockout.           |
+| `LOGIN_WINDOW_MINUTES`   | `15`                    | Window in which failed attempts are counted.                     |
+| `LOGIN_LOCKOUT_MINUTES`  | `15`                    | How long a key stays locked after hitting the limit.             |
+| `GATEWAY_URL`            | `http://localhost:8080` | Base URL of the upstream LLM gateway.                            |
+| `GATEWAY_API_KEY`        | —                       | Shared key TeamGPT uses to call the gateway.                     |
+| `DEFAULT_MODEL`          | `gpt-4o-mini`           | Model selected by default in the UI.                             |
+| `AVAILABLE_MODELS`       | `gpt-4o-mini,mock-gpt`  | Comma-separated models users can pick.                           |
+| `ADMIN_EMAIL`            | `admin@example.com`     | Seed admin email (first boot only).                              |
+| `ADMIN_PASSWORD`         | `change-me-now`         | Seed admin password (first boot only).                           |
+| `DEFAULT_DAILY_REQUESTS` | —                       | Default per-user daily request cap (blank = unlimited).          |
+| `DEFAULT_DAILY_COST_USD` | —                       | Default per-user daily cost cap (blank = unlimited).             |
 
 Per-user budget overrides are set from the admin dashboard and take precedence
 over the defaults.
@@ -113,24 +113,24 @@ Auth uses a `tg_session` httpOnly cookie set on login.
 
 ### Auth
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `POST` | `/api/auth/login` | `{ email, password }` → sets session cookie. |
-| `POST` | `/api/auth/logout` | Clears the session. |
+| Method | Path                        | Description                                                        |
+| ------ | --------------------------- | ------------------------------------------------------------------ |
+| `POST` | `/api/auth/login`           | `{ email, password }` → sets session cookie.                       |
+| `POST` | `/api/auth/logout`          | Clears the session.                                                |
 | `POST` | `/api/auth/change-password` | `{ currentPassword, newPassword }` — self-service password change. |
-| `GET` | `/api/auth/me` | Current user, effective budget, and UI config. |
+| `GET`  | `/api/auth/me`              | Current user, effective budget, and UI config.                     |
 
 ### Conversations (member)
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/conversations` | List conversations + today's usage/limits. Optional `?q=` filters by title/content; `?limit=&offset=` paginate (response includes `total`, `hasMore`). |
-| `POST` | `/api/conversations` | Create a conversation `{ model, title, systemPrompt }`. |
-| `GET` | `/api/conversations/:id` | Full conversation with messages. |
-| `PATCH` | `/api/conversations/:id` | Update `{ title }`, `{ model }`, and/or `{ systemPrompt }`. |
-| `DELETE` | `/api/conversations/:id` | Delete a conversation. |
-| `POST` | `/api/conversations/:id/messages` | Send `{ content }`; streams the reply as SSE. |
-| `POST` | `/api/conversations/:id/regenerate` | Regenerate the last reply; optional `{ content }` edits the last prompt first. Streams SSE. |
+| Method   | Path                                | Description                                                                                                                                            |
+| -------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`    | `/api/conversations`                | List conversations + today's usage/limits. Optional `?q=` filters by title/content; `?limit=&offset=` paginate (response includes `total`, `hasMore`). |
+| `POST`   | `/api/conversations`                | Create a conversation `{ model, title, systemPrompt }`.                                                                                                |
+| `GET`    | `/api/conversations/:id`            | Full conversation with messages.                                                                                                                       |
+| `PATCH`  | `/api/conversations/:id`            | Update `{ title }`, `{ model }`, and/or `{ systemPrompt }`.                                                                                            |
+| `DELETE` | `/api/conversations/:id`            | Delete a conversation.                                                                                                                                 |
+| `POST`   | `/api/conversations/:id/messages`   | Send `{ content }`; streams the reply as SSE.                                                                                                          |
+| `POST`   | `/api/conversations/:id/regenerate` | Regenerate the last reply; optional `{ content }` edits the last prompt first. Streams SSE.                                                            |
 
 The message stream emits:
 
@@ -142,14 +142,14 @@ data: [DONE]
 
 ### Admin
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/admin/users` | All users with limits + usage. |
-| `POST` | `/api/admin/users` | Create a user (`{ email, name, password, role, budget, defaultModel }`). |
-| `GET` | `/api/admin/users/:id` | One user with full usage. |
-| `PATCH` | `/api/admin/users/:id` | Update name/role/password/budget/defaultModel/disabled. |
-| `DELETE` | `/api/admin/users/:id` | Delete a user and their data. |
-| `GET` | `/api/admin/gateway-metrics` | Proxy the gateway's aggregate metrics. |
+| Method   | Path                         | Description                                                              |
+| -------- | ---------------------------- | ------------------------------------------------------------------------ |
+| `GET`    | `/api/admin/users`           | All users with limits + usage.                                           |
+| `POST`   | `/api/admin/users`           | Create a user (`{ email, name, password, role, budget, defaultModel }`). |
+| `GET`    | `/api/admin/users/:id`       | One user with full usage.                                                |
+| `PATCH`  | `/api/admin/users/:id`       | Update name/role/password/budget/defaultModel/disabled.                  |
+| `DELETE` | `/api/admin/users/:id`       | Delete a user and their data.                                            |
+| `GET`    | `/api/admin/gateway-metrics` | Proxy the gateway's aggregate metrics.                                   |
 
 Guards: the last active admin cannot be demoted or disabled, and admins cannot
 delete their own account.

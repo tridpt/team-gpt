@@ -13,7 +13,10 @@ import { hashPassword, verifyPassword } from './password.js';
  */
 const store = new JsonStore(path.join(config.dataDir, 'users.json'), { users: [] });
 
-const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+const normalizeEmail = (email) =>
+  String(email || '')
+    .trim()
+    .toLowerCase();
 
 function publicUser(u) {
   if (!u) return null;
@@ -38,7 +41,15 @@ export function countUsers() {
   return store.data.users.length;
 }
 
-export function createUser({ email, name, password, role = 'member', budget = {}, defaultModel = null, groupId = null }) {
+export function createUser({
+  email,
+  name,
+  password,
+  role = 'member',
+  budget = {},
+  defaultModel = null,
+  groupId = null,
+}) {
   const e = normalizeEmail(email);
   if (!e || !e.includes('@')) throw new Error('A valid email is required.');
   if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');

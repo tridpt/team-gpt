@@ -38,7 +38,8 @@ test('blocks when the daily cost budget is reached', () => {
 });
 
 test('null limits mean unlimited', () => {
-  for (let i = 0; i < 50; i++) record('u-unlimited', { inputTokens: 1, outputTokens: 1, costUsd: 1 });
+  for (let i = 0; i < 50; i++)
+    record('u-unlimited', { inputTokens: 1, outputTokens: 1, costUsd: 1 });
   const res = checkBudget('u-unlimited', { dailyRequests: null, dailyCostUsd: null });
   assert.equal(res.allowed, true);
 });

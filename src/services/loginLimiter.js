@@ -8,7 +8,10 @@
  * move to Redis if you run multiple instances).
  */
 export class LoginLimiter {
-  constructor({ maxAttempts = 5, windowMs = 15 * 60 * 1000, lockoutMs = 15 * 60 * 1000 } = {}, { now = () => Date.now() } = {}) {
+  constructor(
+    { maxAttempts = 5, windowMs = 15 * 60 * 1000, lockoutMs = 15 * 60 * 1000 } = {},
+    { now = () => Date.now() } = {},
+  ) {
     this.maxAttempts = maxAttempts;
     this.windowMs = windowMs;
     this.lockoutMs = lockoutMs;

@@ -7,8 +7,9 @@ const $ = (sel) => document.querySelector(sel);
  * escaping happens before any tag is inserted, model output can never inject
  * HTML. */
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
 }
 
@@ -16,14 +17,79 @@ function escapeHtml(s) {
  * escapes each piece, so it's XSS-safe. Not a full parser — just colors
  * comments, strings, numbers, and common keywords. */
 const CODE_KEYWORDS = new Set([
-  'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
-  'switch', 'case', 'break', 'continue', 'new', 'class', 'extends', 'super', 'this',
-  'import', 'export', 'from', 'default', 'async', 'await', 'yield', 'try', 'catch',
-  'finally', 'throw', 'typeof', 'instanceof', 'in', 'of', 'void', 'delete', 'null',
-  'undefined', 'true', 'false', 'def', 'elif', 'lambda', 'None', 'True', 'False',
-  'and', 'or', 'not', 'pass', 'with', 'as', 'public', 'private', 'protected', 'static',
-  'int', 'float', 'string', 'bool', 'boolean', 'void', 'struct', 'enum', 'interface',
-  'type', 'func', 'package', 'select', 'insert', 'update', 'delete', 'where',
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'if',
+  'else',
+  'for',
+  'while',
+  'do',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'new',
+  'class',
+  'extends',
+  'super',
+  'this',
+  'import',
+  'export',
+  'from',
+  'default',
+  'async',
+  'await',
+  'yield',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'void',
+  'delete',
+  'null',
+  'undefined',
+  'true',
+  'false',
+  'def',
+  'elif',
+  'lambda',
+  'None',
+  'True',
+  'False',
+  'and',
+  'or',
+  'not',
+  'pass',
+  'with',
+  'as',
+  'public',
+  'private',
+  'protected',
+  'static',
+  'int',
+  'float',
+  'string',
+  'bool',
+  'boolean',
+  'void',
+  'struct',
+  'enum',
+  'interface',
+  'type',
+  'func',
+  'package',
+  'select',
+  'insert',
+  'update',
+  'delete',
+  'where',
 ]);
 
 function highlightCode(code) {
@@ -38,7 +104,8 @@ function highlightCode(code) {
     if (comment) out += `<span class="tok-com">${escapeHtml(comment)}</span>`;
     else if (str) out += `<span class="tok-str">${escapeHtml(str)}</span>`;
     else if (num) out += `<span class="tok-num">${escapeHtml(num)}</span>`;
-    else if (word && CODE_KEYWORDS.has(word)) out += `<span class="tok-kw">${escapeHtml(word)}</span>`;
+    else if (word && CODE_KEYWORDS.has(word))
+      out += `<span class="tok-kw">${escapeHtml(word)}</span>`;
     else out += escapeHtml(full);
     last = m.index + full.length;
   }
@@ -62,7 +129,7 @@ function renderMarkdown(src) {
   text = text.replace(/`([^`\n]+)`/g, (m, c) => `<code>${c}</code>`);
   text = text.replace(
     /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    (m, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`
+    (m, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`,
   );
   text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
@@ -74,33 +141,74 @@ function renderMarkdown(src) {
   let list = null;
   let para = [];
   let quote = [];
-  const flushPara = () => { if (para.length) { html.push(`<p>${para.join('<br>')}</p>`); para = []; } };
-  const flushList = () => { if (list) { html.push(`</${list}>`); list = null; } };
-  const flushQuote = () => { if (quote.length) { html.push(`<blockquote>${quote.join('<br>')}</blockquote>`); quote = []; } };
-  const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+  const flushPara = () => {
+    if (para.length) {
+      html.push(`<p>${para.join('<br>')}</p>`);
+      para = [];
+    }
+  };
+  const flushList = () => {
+    if (list) {
+      html.push(`</${list}>`);
+      list = null;
+    }
+  };
+  const flushQuote = () => {
+    if (quote.length) {
+      html.push(`<blockquote>${quote.join('<br>')}</blockquote>`);
+      quote = [];
+    }
+  };
+  const flushAll = () => {
+    flushPara();
+    flushList();
+    flushQuote();
+  };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
+    // eslint-disable-next-line no-control-regex -- NUL bytes are intentional code-block sentinels
     const cb = line.match(/^\u0000CB(\d+)\u0000$/);
-    if (cb) { flushAll(); html.push(codeBlocks[Number(cb[1])]); continue; }
-    if (line.trim() === '') { flushAll(); continue; }
+    if (cb) {
+      flushAll();
+      html.push(codeBlocks[Number(cb[1])]);
+      continue;
+    }
+    if (line.trim() === '') {
+      flushAll();
+      continue;
+    }
 
     const h = line.match(/^(#{1,6})\s+(.*)$/);
-    if (h) { flushAll(); const lvl = Math.min(h[1].length, 3); html.push(`<h${lvl}>${h[2]}</h${lvl}>`); continue; }
+    if (h) {
+      flushAll();
+      const lvl = Math.min(h[1].length, 3);
+      html.push(`<h${lvl}>${h[2]}</h${lvl}>`);
+      continue;
+    }
 
     const ul = line.match(/^[-*+]\s+(.*)$/);
     const ol = line.match(/^\d+\.\s+(.*)$/);
     if (ul || ol) {
-      flushPara(); flushQuote();
+      flushPara();
+      flushQuote();
       const want = ul ? 'ul' : 'ol';
-      if (list !== want) { flushList(); list = want; html.push(`<${want}>`); }
+      if (list !== want) {
+        flushList();
+        list = want;
+        html.push(`<${want}>`);
+      }
       html.push(`<li>${ul ? ul[1] : ol[1]}</li>`);
       continue;
     }
     flushList();
 
     const bq = line.match(/^>\s?(.*)$/);
-    if (bq) { flushPara(); quote.push(bq[1]); continue; }
+    if (bq) {
+      flushPara();
+      quote.push(bq[1]);
+      continue;
+    }
     flushQuote();
 
     para.push(line);
@@ -260,7 +368,10 @@ async function loadConversations(q = '') {
 }
 
 async function loadMoreConversations() {
-  const qs = new URLSearchParams({ limit: String(CONV_PAGE_SIZE), offset: String(state.convOffset) });
+  const qs = new URLSearchParams({
+    limit: String(CONV_PAGE_SIZE),
+    offset: String(state.convOffset),
+  });
   if (state.convQuery) qs.set('q', state.convQuery);
   const data = await api(`/api/conversations?${qs}`);
   state.conversations = state.conversations.concat(data.conversations);
@@ -440,9 +551,7 @@ async function sendMessage() {
 /** Prepend attached text files to the message as labelled fenced blocks. */
 function buildMessageWithAttachments(text, files) {
   if (!files.length) return text;
-  const blocks = files
-    .map((f) => `File: ${f.name}\n\`\`\`\n${f.content}\n\`\`\``)
-    .join('\n\n');
+  const blocks = files.map((f) => `File: ${f.name}\n\`\`\`\n${f.content}\n\`\`\``).join('\n\n');
   return text ? `${blocks}\n\n${text}` : blocks;
 }
 
@@ -692,7 +801,9 @@ $('#model-select').addEventListener('change', async () => {
     const c = state.conversations.find((x) => x.id === state.activeId);
     if (c) c.model = model;
     $('#model-hint').textContent = 'Model updated';
-    setTimeout(() => { $('#model-hint').textContent = ''; }, 1500);
+    setTimeout(() => {
+      $('#model-hint').textContent = '';
+    }, 1500);
   } catch (err) {
     alert(err.message);
   }
@@ -717,14 +828,19 @@ function exportConversation(format) {
     alert('Open a conversation first.');
     return;
   }
-  const base = (conv.title || 'chat').replace(/[^\w\-]+/g, '_').slice(0, 40) || 'chat';
+  const base = (conv.title || 'chat').replace(/[^\w-]+/g, '_').slice(0, 40) || 'chat';
 
   if (format === 'json') {
     downloadFile(`${base}.json`, JSON.stringify(conv, null, 2), 'application/json');
     return;
   }
 
-  const lines = [`# ${conv.title || 'Conversation'}`, '', `- Model: ${conv.model}`, `- Created: ${conv.createdAt}`];
+  const lines = [
+    `# ${conv.title || 'Conversation'}`,
+    '',
+    `- Model: ${conv.model}`,
+    `- Created: ${conv.createdAt}`,
+  ];
   if (conv.systemPrompt) lines.push('', '## System', '', conv.systemPrompt);
   for (const m of conv.messages) {
     lines.push('', `## ${m.role === 'user' ? 'User' : 'Assistant'}`, '', m.content);
@@ -741,7 +857,10 @@ $('#system-btn').addEventListener('click', async () => {
     return;
   }
   const current = state.activeConv?.systemPrompt || '';
-  const next = prompt('System prompt (instructions for the assistant). Leave blank to clear:', current);
+  const next = prompt(
+    'System prompt (instructions for the assistant). Leave blank to clear:',
+    current,
+  );
   if (next == null) return;
   try {
     const conv = await api(`/api/conversations/${state.activeId}`, {
@@ -750,7 +869,9 @@ $('#system-btn').addEventListener('click', async () => {
     });
     if (state.activeConv) state.activeConv.systemPrompt = conv.systemPrompt;
     $('#model-hint').textContent = next.trim() ? 'System prompt set' : 'System prompt cleared';
-    setTimeout(() => { $('#model-hint').textContent = ''; }, 1500);
+    setTimeout(() => {
+      $('#model-hint').textContent = '';
+    }, 1500);
   } catch (err) {
     alert(err.message);
   }
@@ -768,7 +889,7 @@ function renderBudget() {
     const pct = Math.min(100, Math.round((reqUsed / dailyRequests) * 100));
     parts.push(
       `<div class="muted">Requests: ${reqUsed}/${dailyRequests}</div>` +
-        `<div class="usage-bar"><span style="width:${pct}%"></span></div>`
+        `<div class="usage-bar"><span style="width:${pct}%"></span></div>`,
     );
   } else {
     parts.push(`<div class="muted">Requests today: ${reqUsed}</div>`);
@@ -777,7 +898,7 @@ function renderBudget() {
     const pct = Math.min(100, Math.round((costUsed / dailyCostUsd) * 100));
     parts.push(
       `<div class="muted">Cost: $${costUsed.toFixed(4)}/$${dailyCostUsd}</div>` +
-        `<div class="usage-bar"><span style="width:${pct}%"></span></div>`
+        `<div class="usage-bar"><span style="width:${pct}%"></span></div>`,
     );
   } else {
     parts.push(`<div class="muted">Cost today: $${costUsed.toFixed(4)}</div>`);

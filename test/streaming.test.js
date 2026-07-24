@@ -34,13 +34,15 @@ const fakeGateway = http.createServer((req, res) => {
       let i = 0;
       const timer = setInterval(() => {
         if (i < CHUNKS.length) {
-          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: CHUNKS[i] } }] })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: CHUNKS[i] } }] })}\n\n`,
+          );
           i += 1;
         } else {
           clearInterval(timer);
           if (!fakeGateway.suppressUsage && fakeGateway.lastBody?.stream_options?.include_usage) {
             res.write(
-              `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 111, completion_tokens: 222, total_tokens: 333 } })}\n\n`
+              `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 111, completion_tokens: 222, total_tokens: 333 } })}\n\n`,
             );
           }
           res.write('data: [DONE]\n\n');
@@ -135,7 +137,9 @@ test('streams the reply, persists the assistant message, and records usage', asy
   const before = await json('/api/conversations');
   const reqBefore = before.data.usage.requests;
 
-  const { text, done, error } = await stream(`/api/conversations/${convId}/messages`, { content: 'hi there' });
+  const { text, done, error } = await stream(`/api/conversations/${convId}/messages`, {
+    content: 'hi there',
+  });
   assert.equal(error, null);
   assert.equal(text, FULL_REPLY, 'client should receive every streamed delta');
   assert.ok(done, 'a done frame must be sent');
@@ -147,7 +151,10 @@ test('streams the reply, persists the assistant message, and records usage', asy
 
   // Assistant reply persisted.
   const full = await json(`/api/conversations/${convId}`);
-  assert.deepEqual(full.data.messages.map((m) => m.role), ['user', 'assistant']);
+  assert.deepEqual(
+    full.data.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
   assert.equal(full.data.messages[1].content, FULL_REPLY);
 
   // Usage bumped.
@@ -162,22 +169,33 @@ test('regenerate replaces the last reply without duplicating messages', async ()
 
   const full = await json(`/api/conversations/${convId}`);
   // Still exactly one user + one assistant — the old assistant was replaced.
-  assert.deepEqual(full.data.messages.map((m) => m.role), ['user', 'assistant']);
+  assert.deepEqual(
+    full.data.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
 });
 
 test('regenerate with content edits the last user message', async () => {
-  const { text } = await stream(`/api/conversations/${convId}/regenerate`, { content: 'a different question' });
+  const { text } = await stream(`/api/conversations/${convId}/regenerate`, {
+    content: 'a different question',
+  });
   assert.equal(text, FULL_REPLY);
 
   const full = await json(`/api/conversations/${convId}`);
-  assert.deepEqual(full.data.messages.map((m) => m.role), ['user', 'assistant']);
+  assert.deepEqual(
+    full.data.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
   assert.equal(full.data.messages[0].content, 'a different question');
 });
 
 test('the system prompt is forwarded to the gateway', async () => {
   const created = await json('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
   const id = created.data.id;
-  await json(`/api/conversations/${id}`, { method: 'PATCH', body: { systemPrompt: 'You are a pirate.' } });
+  await json(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: { systemPrompt: 'You are a pirate.' },
+  });
 
   await stream(`/api/conversations/${id}/messages`, { content: 'ahoy' });
 
@@ -191,8 +209,13 @@ test('the system prompt is forwarded to the gateway', async () => {
 test('falls back to estimated usage when the gateway omits it', async () => {
   fakeGateway.suppressUsage = true;
   try {
-    const created = await json('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
-    const { text, done } = await stream(`/api/conversations/${created.data.id}/messages`, { content: 'hi' });
+    const created = await json('/api/conversations', {
+      method: 'POST',
+      body: { model: 'mock-gpt' },
+    });
+    const { text, done } = await stream(`/api/conversations/${created.data.id}/messages`, {
+      content: 'hi',
+    });
     assert.equal(text, FULL_REPLY);
     assert.equal(done.estimated, true);
     assert.ok(done.usage.outputTokens > 0);
@@ -207,8 +230,13 @@ test('a gateway failure surfaces as an SSE error frame', async () => {
   const goodUrl = config.gateway.url;
   config.gateway.url = 'http://127.0.0.1:1';
   try {
-    const created = await json('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
-    const { text, done, error } = await stream(`/api/conversations/${created.data.id}/messages`, { content: 'hi' });
+    const created = await json('/api/conversations', {
+      method: 'POST',
+      body: { model: 'mock-gpt' },
+    });
+    const { text, done, error } = await stream(`/api/conversations/${created.data.id}/messages`, {
+      content: 'hi',
+    });
     assert.equal(text, '');
     assert.equal(done, null);
     assert.ok(error, 'an error frame should be sent');

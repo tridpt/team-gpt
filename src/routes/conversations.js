@@ -60,7 +60,8 @@ conversationsRouter.patch('/conversations/:id', (req, res) => {
   if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
 
   if (model !== undefined) conv = conversations.setModel(req.user.id, id, model);
-  if (systemPrompt !== undefined) conv = conversations.setSystemPrompt(req.user.id, id, systemPrompt);
+  if (systemPrompt !== undefined)
+    conv = conversations.setSystemPrompt(req.user.id, id, systemPrompt);
   if (title !== undefined) conv = conversations.rename(req.user.id, id, title);
 
   res.json(conv);

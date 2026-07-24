@@ -68,7 +68,10 @@ test('conversation CRUD round-trip', async () => {
   assert.equal(created.status, 201);
   const id = created.data.id;
 
-  const renamed = await req(`/api/conversations/${id}`, { method: 'PATCH', body: { title: 'Hello' } });
+  const renamed = await req(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: { title: 'Hello' },
+  });
   assert.equal(renamed.data.title, 'Hello');
 
   const list = await req('/api/conversations');
@@ -82,7 +85,10 @@ test('conversation CRUD round-trip', async () => {
 });
 
 test('unknown model falls back to the default', async () => {
-  const created = await req('/api/conversations', { method: 'POST', body: { model: 'not-a-model' } });
+  const created = await req('/api/conversations', {
+    method: 'POST',
+    body: { model: 'not-a-model' },
+  });
   assert.equal(created.data.model, 'mock-gpt');
 });
 
@@ -90,7 +96,10 @@ test('PATCH can change a conversation model and rejects unknown ones', async () 
   const created = await req('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
   const id = created.data.id;
 
-  const ok = await req(`/api/conversations/${id}`, { method: 'PATCH', body: { model: 'gpt-4o-mini' } });
+  const ok = await req(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: { model: 'gpt-4o-mini' },
+  });
   assert.equal(ok.status, 200);
   assert.equal(ok.data.model, 'gpt-4o-mini');
 
@@ -118,7 +127,10 @@ test('PATCH sets a system prompt and it persists', async () => {
 });
 
 test('conversation search filters by title', async () => {
-  const a = await req('/api/conversations', { method: 'POST', body: { title: 'Zebra safari notes' } });
+  const a = await req('/api/conversations', {
+    method: 'POST',
+    body: { title: 'Zebra safari notes' },
+  });
   const b = await req('/api/conversations', { method: 'POST', body: { title: 'Tax paperwork' } });
 
   const found = await req('/api/conversations?q=zebra');
@@ -131,7 +143,10 @@ test('conversation search filters by title', async () => {
 
 test('regenerate returns 400 when there is nothing to regenerate', async () => {
   const created = await req('/api/conversations', { method: 'POST', body: { model: 'mock-gpt' } });
-  const r = await req(`/api/conversations/${created.data.id}/regenerate`, { method: 'POST', body: {} });
+  const r = await req(`/api/conversations/${created.data.id}/regenerate`, {
+    method: 'POST',
+    body: {},
+  });
   assert.equal(r.status, 400);
   assert.match(r.data.error, /nothing to regenerate/i);
   await req(`/api/conversations/${created.data.id}`, { method: 'DELETE' });
@@ -220,7 +235,10 @@ test('a per-user default model drives /me and new conversations', async () => {
   const me = await req('/api/auth/me');
   const adminId = me.data.user.id;
 
-  await req(`/api/admin/users/${adminId}`, { method: 'PATCH', body: { defaultModel: 'gpt-4o-mini' } });
+  await req(`/api/admin/users/${adminId}`, {
+    method: 'PATCH',
+    body: { defaultModel: 'gpt-4o-mini' },
+  });
 
   const me2 = await req('/api/auth/me');
   assert.equal(me2.data.config.defaultModel, 'gpt-4o-mini');
@@ -239,7 +257,10 @@ test('a per-user default model drives /me and new conversations', async () => {
 test('conversation list paginates with limit/offset and hasMore', async () => {
   const created = [];
   for (let i = 0; i < 3; i++) {
-    const c = await req('/api/conversations', { method: 'POST', body: { title: `Page test ${i}` } });
+    const c = await req('/api/conversations', {
+      method: 'POST',
+      body: { title: `Page test ${i}` },
+    });
     created.push(c.data.id);
   }
 

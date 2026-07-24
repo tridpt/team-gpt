@@ -49,7 +49,13 @@ function round(n) {
 export function getTodayUsage(userId) {
   const b = currentBucket(userId);
   store.flush();
-  return { date: b.date, requests: b.requests, inputTokens: b.inputTokens, outputTokens: b.outputTokens, costUsd: round(b.costUsd) };
+  return {
+    date: b.date,
+    requests: b.requests,
+    inputTokens: b.inputTokens,
+    outputTokens: b.outputTokens,
+    costUsd: round(b.costUsd),
+  };
 }
 
 /**
@@ -59,10 +65,20 @@ export function getTodayUsage(userId) {
 export function checkBudget(userId, limits) {
   const usage = getTodayUsage(userId);
   if (limits.dailyRequests != null && usage.requests >= limits.dailyRequests) {
-    return { allowed: false, reason: `Daily request limit reached (${limits.dailyRequests}/day).`, usage, limits };
+    return {
+      allowed: false,
+      reason: `Daily request limit reached (${limits.dailyRequests}/day).`,
+      usage,
+      limits,
+    };
   }
   if (limits.dailyCostUsd != null && usage.costUsd >= limits.dailyCostUsd) {
-    return { allowed: false, reason: `Daily cost budget reached ($${limits.dailyCostUsd}/day).`, usage, limits };
+    return {
+      allowed: false,
+      reason: `Daily cost budget reached ($${limits.dailyCostUsd}/day).`,
+      usage,
+      limits,
+    };
   }
   return { allowed: true, usage, limits };
 }
@@ -93,7 +109,8 @@ export function record(userId, { inputTokens = 0, outputTokens = 0, costUsd = 0 
 export function getUserUsage(userId) {
   const rec = userRecord(userId);
   const day = today();
-  const todayBucket = rec.today && rec.today.date === day ? rec.today : { date: day, ...emptyTotals() };
+  const todayBucket =
+    rec.today && rec.today.date === day ? rec.today : { date: day, ...emptyTotals() };
   return {
     today: { ...todayBucket, costUsd: round(todayBucket.costUsd) },
     history: rec.history,

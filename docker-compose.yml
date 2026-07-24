@@ -14,16 +14,16 @@ services:
     build: ../llm-gateway
     image: llm-gateway:latest
     environment:
-      PORT: "8080"
-      GATEWAY_API_KEYS: "${GATEWAY_API_KEY:-demo-key-123}"
-      PROVIDER_ORDER: "${PROVIDER_ORDER:-mock}"
-      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      LOG_TO_FILE: "false"
+      PORT: '8080'
+      GATEWAY_API_KEYS: '${GATEWAY_API_KEY:-demo-key-123}'
+      PROVIDER_ORDER: '${PROVIDER_ORDER:-mock}'
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      ANTHROPIC_API_KEY: '${ANTHROPIC_API_KEY:-}'
+      GEMINI_API_KEY: '${GEMINI_API_KEY:-}'
+      LOG_TO_FILE: 'false'
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/health"]
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:8080/health']
       interval: 30s
       timeout: 3s
       retries: 3
@@ -36,19 +36,19 @@ services:
       gateway:
         condition: service_healthy
     ports:
-      - "${PORT:-4000}:4000"
+      - '${PORT:-4000}:4000'
     environment:
-      PORT: "4000"
-      DATA_DIR: "/app/data"
-      GATEWAY_URL: "http://gateway:8080"
-      GATEWAY_API_KEY: "${GATEWAY_API_KEY:-demo-key-123}"
-      DEFAULT_MODEL: "${DEFAULT_MODEL:-mock-gpt}"
-      AVAILABLE_MODELS: "${AVAILABLE_MODELS:-gpt-4o-mini,gemini-2.0-flash,mock-gpt}"
-      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-change-me-now}"
-      DEFAULT_DAILY_REQUESTS: "${DEFAULT_DAILY_REQUESTS:-}"
-      DEFAULT_DAILY_COST_USD: "${DEFAULT_DAILY_COST_USD:-}"
-      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      PORT: '4000'
+      DATA_DIR: '/app/data'
+      GATEWAY_URL: 'http://gateway:8080'
+      GATEWAY_API_KEY: '${GATEWAY_API_KEY:-demo-key-123}'
+      DEFAULT_MODEL: '${DEFAULT_MODEL:-mock-gpt}'
+      AVAILABLE_MODELS: '${AVAILABLE_MODELS:-gpt-4o-mini,gemini-2.0-flash,mock-gpt}'
+      ADMIN_EMAIL: '${ADMIN_EMAIL:-admin@example.com}'
+      ADMIN_PASSWORD: '${ADMIN_PASSWORD:-change-me-now}'
+      DEFAULT_DAILY_REQUESTS: '${DEFAULT_DAILY_REQUESTS:-}'
+      DEFAULT_DAILY_COST_USD: '${DEFAULT_DAILY_COST_USD:-}'
+      COOKIE_SECURE: '${COOKIE_SECURE:-false}'
     volumes:
       - teamgpt-data:/app/data
     restart: unless-stopped

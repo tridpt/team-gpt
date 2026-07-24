@@ -1,83 +1,88 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TeamGPT</title>
-  <link rel="stylesheet" href="/style.css" />
-</head>
-<body>
-  <!-- Login view -->
-  <div id="login-view" class="center-screen hidden">
-    <form class="card" id="login-form">
-      <div class="brand" style="margin-bottom:18px"><span class="dot"></span> TeamGPT</div>
-      <h1>Sign in</h1>
-      <p class="sub">Self-hosted AI chat for your team.</p>
-      <div class="field">
-        <label for="email">Email</label>
-        <input type="email" id="email" autocomplete="username" required />
-      </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input type="password" id="password" autocomplete="current-password" required />
-      </div>
-      <p class="error-msg" id="login-error"></p>
-      <button class="btn" type="submit">Sign in</button>
-    </form>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TeamGPT</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!-- Login view -->
+    <div id="login-view" class="center-screen hidden">
+      <form class="card" id="login-form">
+        <div class="brand" style="margin-bottom: 18px"><span class="dot"></span> TeamGPT</div>
+        <h1>Sign in</h1>
+        <p class="sub">Self-hosted AI chat for your team.</p>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <p class="error-msg" id="login-error"></p>
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+    </div>
 
-  <!-- Chat app view -->
-  <div id="app-view" class="app hidden">
-    <aside class="sidebar">
-      <div class="sidebar-head">
-        <div class="brand"><span class="dot"></span> TeamGPT</div>
-        <button class="btn new-chat" id="new-chat-btn">+ New chat</button>
-        <input type="search" id="conv-search" class="conv-search" placeholder="Search chats…" />
-      </div>
-      <div class="conv-list" id="conv-list"></div>
-      <div class="sidebar-foot">
-        <div class="foot-row">
-          <span id="user-name" class="muted"></span>
-          <span>
-            <a href="#" id="change-pw-link" class="muted">Password</a>
-            &nbsp;·&nbsp;
-            <a href="#" id="logout-link" class="muted">Sign out</a>
-          </span>
+    <!-- Chat app view -->
+    <div id="app-view" class="app hidden">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div class="brand"><span class="dot"></span> TeamGPT</div>
+          <button class="btn new-chat" id="new-chat-btn">+ New chat</button>
+          <input type="search" id="conv-search" class="conv-search" placeholder="Search chats…" />
         </div>
-        <div id="budget-box" style="margin-top:10px"></div>
-        <div class="foot-row">
-          <a href="/admin.html" id="admin-link" class="hidden">Admin dashboard →</a>
+        <div class="conv-list" id="conv-list"></div>
+        <div class="sidebar-foot">
+          <div class="foot-row">
+            <span id="user-name" class="muted"></span>
+            <span>
+              <a href="#" id="change-pw-link" class="muted">Password</a>
+              &nbsp;·&nbsp;
+              <a href="#" id="logout-link" class="muted">Sign out</a>
+            </span>
+          </div>
+          <div id="budget-box" style="margin-top: 10px"></div>
+          <div class="foot-row">
+            <a href="/admin.html" id="admin-link" class="hidden">Admin dashboard →</a>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
 
-    <main class="main">
-      <div class="main-head">
-        <div class="head-left">
-          <select id="model-select"></select>
-          <span class="muted" id="model-hint"></span>
+      <main class="main">
+        <div class="main-head">
+          <div class="head-left">
+            <select id="model-select"></select>
+            <span class="muted" id="model-hint"></span>
+          </div>
+          <div class="head-actions">
+            <button class="btn ghost" id="system-btn" title="Set a system prompt">System</button>
+            <button class="btn ghost" id="export-md" title="Export as Markdown">⬇ MD</button>
+            <button class="btn ghost" id="export-json" title="Export as JSON">⬇ JSON</button>
+          </div>
         </div>
-        <div class="head-actions">
-          <button class="btn ghost" id="system-btn" title="Set a system prompt">System</button>
-          <button class="btn ghost" id="export-md" title="Export as Markdown">⬇ MD</button>
-          <button class="btn ghost" id="export-json" title="Export as JSON">⬇ JSON</button>
+        <div class="messages" id="messages"></div>
+        <div class="composer">
+          <div class="attachments" id="attachments"></div>
+          <div class="composer-inner">
+            <input
+              type="file"
+              id="file-input"
+              class="hidden"
+              multiple
+              accept=".txt,.md,.markdown,.csv,.json,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.cs,.php,.sh,.yml,.yaml,.xml,.html,.css,.sql,.log,.ini,.toml,.env,.text"
+            />
+            <button class="btn ghost attach" id="attach-btn" title="Attach text files">📎</button>
+            <textarea id="input" placeholder="Send a message…" rows="1"></textarea>
+            <button class="btn send" id="send-btn">Send</button>
+            <button class="btn danger send hidden" id="stop-btn">Stop</button>
+          </div>
         </div>
-      </div>
-      <div class="messages" id="messages"></div>
-      <div class="composer">
-        <div class="attachments" id="attachments"></div>
-        <div class="composer-inner">
-          <input type="file" id="file-input" class="hidden" multiple
-                 accept=".txt,.md,.markdown,.csv,.json,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.cs,.php,.sh,.yml,.yaml,.xml,.html,.css,.sql,.log,.ini,.toml,.env,.text" />
-          <button class="btn ghost attach" id="attach-btn" title="Attach text files">📎</button>
-          <textarea id="input" placeholder="Send a message…" rows="1"></textarea>
-          <button class="btn send" id="send-btn">Send</button>
-          <button class="btn danger send hidden" id="stop-btn">Stop</button>
-        </div>
-      </div>
-    </main>
-  </div>
+      </main>
+    </div>
 
-  <script src="/app.js"></script>
-</body>
+    <script src="/app.js"></script>
+  </body>
 </html>

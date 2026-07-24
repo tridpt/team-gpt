@@ -102,7 +102,7 @@ async function loadGatewayMetrics() {
     grid.innerHTML = stats
       .map(
         (s) =>
-          `<div class="stat"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`
+          `<div class="stat"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`,
       )
       .join('');
   } catch (err) {
@@ -119,11 +119,15 @@ function flattenMetrics(m) {
   const cacheRate = m.cacheHitRate ?? m.cache?.hitRate;
 
   if (totalReq != null) out.push({ label: 'Gateway requests', value: totalReq });
-  if (totalCost != null) out.push({ label: 'Gateway cost', value: `$${Number(totalCost).toFixed(4)}` });
+  if (totalCost != null)
+    out.push({ label: 'Gateway cost', value: `$${Number(totalCost).toFixed(4)}` });
   if (cacheHits != null) out.push({ label: 'Cache hits', value: cacheHits });
   if (cacheRate != null) {
     const rate = Number(cacheRate);
-    out.push({ label: 'Cache hit rate', value: rate <= 1 ? `${(rate * 100).toFixed(1)}%` : `${rate.toFixed(1)}%` });
+    out.push({
+      label: 'Cache hit rate',
+      value: rate <= 1 ? `${(rate * 100).toFixed(1)}%` : `${rate.toFixed(1)}%`,
+    });
   }
   out.push({ label: 'Team members', value: state.users.length });
   return out;
@@ -173,8 +177,9 @@ function renderUsers() {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
 }
 
@@ -191,7 +196,8 @@ function openModal(user) {
   $('#u-name').value = editing ? user.name || '' : '';
   $('#u-role').value = editing ? user.role : 'member';
   $('#u-default-model').value = editing ? user.defaultModel || '' : '';
-  $('#u-req').value = editing && user.budget?.dailyRequests != null ? user.budget.dailyRequests : '';
+  $('#u-req').value =
+    editing && user.budget?.dailyRequests != null ? user.budget.dailyRequests : '';
   $('#u-cost').value = editing && user.budget?.dailyCostUsd != null ? user.budget.dailyCostUsd : '';
   $('#u-disabled').checked = editing ? Boolean(user.disabled) : false;
 
@@ -295,8 +301,10 @@ function openGroupModal(group) {
 
   $('#g-id').value = editing ? group.id : '';
   $('#g-name').value = editing ? group.name : '';
-  $('#g-req').value = editing && group.budget?.dailyRequests != null ? group.budget.dailyRequests : '';
-  $('#g-cost').value = editing && group.budget?.dailyCostUsd != null ? group.budget.dailyCostUsd : '';
+  $('#g-req').value =
+    editing && group.budget?.dailyRequests != null ? group.budget.dailyRequests : '';
+  $('#g-cost').value =
+    editing && group.budget?.dailyCostUsd != null ? group.budget.dailyCostUsd : '';
 
   $('#group-modal').classList.remove('hidden');
 }
@@ -339,7 +347,12 @@ $('#group-form').addEventListener('submit', async (e) => {
 });
 
 async function deleteGroup(g) {
-  if (!confirm(`Delete group "${g.name}"? Members will be unassigned (their own budgets still apply).`)) return;
+  if (
+    !confirm(
+      `Delete group "${g.name}"? Members will be unassigned (their own budgets still apply).`,
+    )
+  )
+    return;
   try {
     await api(`/api/admin/groups/${g.id}`, { method: 'DELETE' });
     loadAll();

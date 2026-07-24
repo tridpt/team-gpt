@@ -24,7 +24,10 @@ test('createUser rejects bad email and short passwords', () => {
 
 test('createUser rejects duplicate emails', () => {
   createUser({ email: 'dup@example.com', password: 'secret1' });
-  assert.throws(() => createUser({ email: 'dup@example.com', password: 'secret1' }), /already exists/i);
+  assert.throws(
+    () => createUser({ email: 'dup@example.com', password: 'secret1' }),
+    /already exists/i,
+  );
 });
 
 test('authenticate succeeds with correct creds and fails otherwise', () => {
@@ -48,7 +51,11 @@ test('updateUser can change the password', () => {
 });
 
 test('createUser stores an optional default model; updateUser can change it', () => {
-  const u = createUser({ email: 'fdefault@example.com', password: 'secret1', defaultModel: 'gpt-4o-mini' });
+  const u = createUser({
+    email: 'fdefault@example.com',
+    password: 'secret1',
+    defaultModel: 'gpt-4o-mini',
+  });
   assert.equal(u.defaultModel, 'gpt-4o-mini');
   updateUser(u.id, { defaultModel: 'mock-gpt' });
   assert.equal(findByEmail('fdefault@example.com').defaultModel, 'mock-gpt');

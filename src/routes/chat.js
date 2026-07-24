@@ -48,7 +48,7 @@ async function streamReply(req, res, userId, conv) {
   try {
     const { fullText, usage: realUsage } = await chatStream(
       { model, messages: contextMessages, signal: controller.signal },
-      (delta) => send({ type: 'delta', text: delta })
+      (delta) => send({ type: 'delta', text: delta }),
     );
 
     conversations.addMessage(userId, conv.id, { role: 'assistant', content: fullText });

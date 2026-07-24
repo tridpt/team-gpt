@@ -16,7 +16,9 @@ const store = new JsonStore(path.join(config.dataDir, 'conversations.json'), { c
 const MAX_CONTEXT_MESSAGES = 20; // how much history to send upstream
 
 function summarizeTitle(text) {
-  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  const t = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > 60 ? `${t.slice(0, 57)}...` : t || 'New chat';
 }
 
@@ -75,14 +77,16 @@ export function contextMessages(conv) {
 
 /** Search a user's conversations by title or message content (case-insensitive). */
 export function searchForUser(userId, query) {
-  const q = String(query || '').trim().toLowerCase();
+  const q = String(query || '')
+    .trim()
+    .toLowerCase();
   if (!q) return listForUser(userId);
   return Object.values(store.data.conversations)
     .filter((c) => c.userId === userId)
     .filter(
       (c) =>
         c.title.toLowerCase().includes(q) ||
-        c.messages.some((m) => String(m.content).toLowerCase().includes(q))
+        c.messages.some((m) => String(m.content).toLowerCase().includes(q)),
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map(({ messages, ...meta }) => ({ ...meta, messageCount: messages.length }));

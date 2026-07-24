@@ -13,7 +13,9 @@ const loginLimiter = new LoginLimiter(config.loginLimit);
 // everyone, and one victim account isn't trivially locked from every IP.
 function limiterKey(req, email) {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  return `${ip}:${String(email || '').trim().toLowerCase()}`;
+  return `${ip}:${String(email || '')
+    .trim()
+    .toLowerCase()}`;
 }
 
 function setSessionCookie(res, sessionId) {
@@ -30,7 +32,7 @@ function setSessionCookie(res, sessionId) {
     const secure = config.cookieSecure ? '; Secure' : '';
     res.setHeader(
       'Set-Cookie',
-      `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax${secure}; Path=/; Max-Age=${maxAge}`
+      `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax${secure}; Path=/; Max-Age=${maxAge}`,
     );
   }
 }

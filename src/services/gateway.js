@@ -37,7 +37,12 @@ export async function chatStream({ model, messages, signal }, onDelta) {
     res = await fetch(`${config.gateway.url}/v1/chat/completions`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ model, messages, stream: true, stream_options: { include_usage: true } }),
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
       signal,
     });
   } catch (err) {
