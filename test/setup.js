@@ -20,6 +20,9 @@ process.env.DEFAULT_MODEL = 'mock-gpt';
 process.env.AVAILABLE_MODELS = 'mock-gpt,gpt-4o-mini';
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.ADMIN_PASSWORD = 'change-me-now';
+// Keep budget defaults unset so ./.env values don't leak into tests.
+process.env.DEFAULT_DAILY_REQUESTS = '';
+process.env.DEFAULT_DAILY_COST_USD = '';
 
 // Best-effort cleanup when the test process exits.
 process.on('exit', () => {
