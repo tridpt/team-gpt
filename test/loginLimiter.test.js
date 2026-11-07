@@ -47,9 +47,21 @@ test('failures outside the window start a fresh count', () => {
   assert.equal(l.check('k').allowed, true);
 });
 
-test('keys are tracked independently', () => {
-  const l = new LoginLimiter(opts);
+test('keys are tracked independently and expired keys are evicted', () => {
+  let t = 1000;
+  const l = new LoginLimiter(opts, { now: () => t });
   for (let i = 0; i < 3; i++) l.recordFailure('a');
+  l.recordFailure('stale');
   assert.equal(l.check('a').allowed, false);
   assert.equal(l.check('b').allowed, true);
+  assert.equal(l.entries.size, 2);
+
+  t += 10_001; // window elapsed for 'stale', but 'a' is still locked (lockoutMs = 30_000)
+  assert.equal(l.check('b').allowed, true);
+  assert.equal(l.entries.has('stale'), false);
+  assert.equal(l.entries.has('a'), true);
+
+  t += 20_001; // now 'a' lockout has also expired
+  assert.equal(l.check('b').allowed, true);
+  assert.equal(l.entries.size, 0);
 });

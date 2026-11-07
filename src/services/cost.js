@@ -7,8 +7,8 @@
  * layer (especially for streamed replies, where exact usage is not returned).
  */
 const PRICING = {
-  'gpt-4o': { input: 2.5, output: 10 },
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
+  'gpt-4o': { input: 2.5, output: 10 },
   'gpt-4-turbo': { input: 10, output: 30 },
   'gpt-3.5-turbo': { input: 0.5, output: 1.5 },
   'claude-3-5-sonnet': { input: 3, output: 15 },
@@ -28,7 +28,9 @@ const DEFAULT_PRICING = { input: 1, output: 3 };
 
 function priceFor(model = '') {
   if (PRICING[model]) return PRICING[model];
-  const key = Object.keys(PRICING).find((k) => model.startsWith(k));
+  const key = Object.keys(PRICING)
+    .sort((a, b) => b.length - a.length)
+    .find((k) => model.startsWith(k));
   return key ? PRICING[key] : DEFAULT_PRICING;
 }
 

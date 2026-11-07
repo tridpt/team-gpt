@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { record, checkBudget, getUserUsage, getTodayUsage } from '../src/services/usage.js';
 
 // Each test uses a distinct user id: the store is a per-file singleton, so
@@ -44,8 +45,22 @@ test('null limits mean unlimited', () => {
   assert.equal(res.allowed, true);
 });
 
-test('getTodayUsage reports a rounded cost and a UTC date', () => {
-  const u = getTodayUsage('u-today');
-  assert.equal(u.requests, 0);
-  assert.match(u.date, /^\d{4}-\d{2}-\d{2}$/);
+test('getTodayUsage reports a rounded cost and a UTC date without writing to disk on read', () => {
+  record('u-today-read', { inputTokens: 4, outputTokens: 4, costUsd: 0.001 });
+  const origWrite = fs.writeFileSync;
+  let writes = 0;
+  fs.writeFileSync = (...args) => {
+    writes += 1;
+    return origWrite(...args);
+  };
+  try {
+    const u = getTodayUsage('u-today-read');
+    assert.equal(u.requests, 1);
+    assert.match(u.date, /^\d{4}-\d{2}-\d{2}$/);
+    const u2 = getTodayUsage('u-today-brand-new');
+    assert.equal(u2.requests, 0);
+    assert.equal(writes, 0);
+  } finally {
+    fs.writeFileSync = origWrite;
+  }
 });

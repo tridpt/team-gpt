@@ -46,4 +46,9 @@ test('prefix match picks up versioned model names', () => {
   const base = computeCost('gpt-4o', 1_000_000, 0);
   const versioned = computeCost('gpt-4o-2024-08-06', 1_000_000, 0);
   assert.equal(versioned, base);
+
+  const miniBase = computeCost('gpt-4o-mini', 1_000_000, 1_000_000);
+  const miniVersioned = computeCost('gpt-4o-mini-2024-07-18', 1_000_000, 1_000_000);
+  assert.equal(miniVersioned, miniBase);
+  assert.notEqual(miniVersioned, computeCost('gpt-4o', 1_000_000, 1_000_000));
 });

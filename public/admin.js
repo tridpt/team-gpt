@@ -62,7 +62,7 @@ function renderGroups() {
   if (!body) return;
   body.innerHTML = '';
   if (!state.groups.length) {
-    body.innerHTML = '<tr><td colspan="4" class="muted">No groups yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="muted">No groups yet.</td></tr>';
     return;
   }
   for (const g of state.groups) {
@@ -70,8 +70,9 @@ function renderGroups() {
     const tr = document.createElement('tr');
     tr.innerHTML =
       `<td>${escapeHtml(g.name)}</td>` +
-      `<td class="muted">${fmtLimit(g.budget || {})}</td>` +
-      `<td>${memberCount}</td>`;
+      `<td>${memberCount}</td>` +
+      `<td>${g.usage?.requests ?? 0} req · $${Number(g.usage?.costUsd ?? 0).toFixed(4)}</td>` +
+      `<td class="muted">${fmtLimit(g.budget || {})}</td>`;
 
     const actions = document.createElement('td');
     actions.className = 'row-actions';
@@ -113,10 +114,10 @@ async function loadGatewayMetrics() {
 // Best-effort extraction of a few headline numbers from the gateway payload.
 function flattenMetrics(m) {
   const out = [];
-  const totalReq = m.totalRequests ?? m.requests ?? m.requestCount;
-  const totalCost = m.totalCostUsd ?? m.costUsd ?? m.totalCost;
-  const cacheHits = m.cacheHits ?? m.cache?.hits;
-  const cacheRate = m.cacheHitRate ?? m.cache?.hitRate;
+  const totalReq = m.totals?.requests ?? m.totalRequests ?? m.requests ?? m.requestCount;
+  const totalCost = m.totals?.costUsd ?? m.totalCostUsd ?? m.costUsd ?? m.totalCost;
+  const cacheHits = m.totals?.cacheHits ?? m.cacheHits ?? m.cache?.hits;
+  const cacheRate = m.cacheHitRatePercent ?? m.cacheHitRate ?? m.cache?.hitRate;
 
   if (totalReq != null) out.push({ label: 'Gateway requests', value: totalReq });
   if (totalCost != null)
@@ -124,9 +125,10 @@ function flattenMetrics(m) {
   if (cacheHits != null) out.push({ label: 'Cache hits', value: cacheHits });
   if (cacheRate != null) {
     const rate = Number(cacheRate);
+    const isPercent = m.cacheHitRatePercent != null;
     out.push({
       label: 'Cache hit rate',
-      value: rate <= 1 ? `${(rate * 100).toFixed(1)}%` : `${rate.toFixed(1)}%`,
+      value: !isPercent && rate <= 1 ? `${(rate * 100).toFixed(1)}%` : `${rate.toFixed(1)}%`,
     });
   }
   out.push({ label: 'Team members', value: state.users.length });

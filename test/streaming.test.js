@@ -244,3 +244,52 @@ test('a gateway failure surfaces as an SSE error frame', async () => {
     config.gateway.url = goodUrl;
   }
 });
+
+test('aborting mid-stream persists the partial assistant reply and records usage', async () => {
+  const created = await json('/api/conversations', {
+    method: 'POST',
+    body: { model: 'mock-gpt' },
+  });
+  const abortConvId = created.data.id;
+  const before = await json('/api/conversations');
+  const reqBefore = before.data.usage.requests;
+
+  const ac = new AbortController();
+  const res = await fetch(`${base}/api/conversations/${abortConvId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    body: JSON.stringify({ content: 'abort after first chunk' }),
+    signal: ac.signal,
+  });
+  assert.equal(res.status, 200);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let receivedDelta = false;
+  try {
+    while (!receivedDelta) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      if (buf.includes('"type":"delta"')) {
+        receivedDelta = true;
+        ac.abort();
+      }
+    }
+  } catch {
+    // Expected AbortError
+  }
+
+  // Wait briefly for the server's close handler to finish persisting.
+  await new Promise((r) => setTimeout(r, 40));
+
+  const full = await json(`/api/conversations/${abortConvId}`);
+  assert.deepEqual(
+    full.data.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
+  assert.ok(full.data.messages[1].content.length > 0);
+
+  const after = await json('/api/conversations');
+  assert.equal(after.data.usage.requests, reqBefore + 1);
+});

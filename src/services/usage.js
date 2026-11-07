@@ -32,11 +32,13 @@ function currentBucket(userId) {
   const day = today();
   if (!rec.today || rec.today.date !== day) {
     // Roll the previous day into history before resetting.
+    const rolledOver = Boolean(rec.today);
     if (rec.today) {
       rec.history.push(rec.today);
       if (rec.history.length > HISTORY_DAYS) rec.history.shift();
     }
     rec.today = { date: day, ...emptyTotals() };
+    if (rolledOver) store.flush();
   }
   return rec.today;
 }
@@ -48,7 +50,6 @@ function round(n) {
 /** Today's usage for a user (does not mutate). */
 export function getTodayUsage(userId) {
   const b = currentBucket(userId);
-  store.flush();
   return {
     date: b.date,
     requests: b.requests,

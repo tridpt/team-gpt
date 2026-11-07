@@ -19,10 +19,24 @@ export class LoginLimiter {
     this.entries = new Map(); // key -> { count, first, lockedUntil }
   }
 
+  _isExpired(rec, t) {
+    if (rec.lockedUntil) return rec.lockedUntil <= t;
+    return t - rec.first > this.windowMs;
+  }
+
+  _prune(t) {
+    for (const [k, rec] of this.entries) {
+      if (this._isExpired(rec, t)) {
+        this.entries.delete(k);
+      }
+    }
+  }
+
   /** @returns {{ allowed: boolean, retryAfterSeconds?: number }} */
   check(key) {
-    const rec = this.entries.get(key);
     const t = this.now();
+    this._prune(t);
+    const rec = this.entries.get(key);
     if (rec && rec.lockedUntil > t) {
       return { allowed: false, retryAfterSeconds: Math.ceil((rec.lockedUntil - t) / 1000) };
     }
@@ -32,11 +46,8 @@ export class LoginLimiter {
   /** Record a failed attempt; may transition the key into a locked state. */
   recordFailure(key) {
     const t = this.now();
-    let rec = this.entries.get(key);
-    // Start a fresh window if none exists, the window elapsed, or a lock expired.
-    if (!rec || t - rec.first > this.windowMs || (rec.lockedUntil && rec.lockedUntil <= t)) {
-      rec = { count: 0, first: t, lockedUntil: 0 };
-    }
+    this._prune(t);
+    const rec = this.entries.get(key) || { count: 0, first: t, lockedUntil: 0 };
     rec.count += 1;
     if (rec.count >= this.maxAttempts) {
       rec.lockedUntil = t + this.lockoutMs;

@@ -43,8 +43,9 @@ test('disabled users cannot authenticate', () => {
   assert.equal(authenticate('carol@example.com', 'hunter2'), null);
 });
 
-test('updateUser can change the password', () => {
+test('updateUser can change the password and rejects short passwords', () => {
   const u = createUser({ email: 'dave@example.com', password: 'oldpass' });
+  assert.throws(() => updateUser(u.id, { password: '123' }), /6 characters/i);
   updateUser(u.id, { password: 'newpass1' });
   assert.equal(authenticate('dave@example.com', 'oldpass'), null);
   assert.ok(authenticate('dave@example.com', 'newpass1'));

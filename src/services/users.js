@@ -89,7 +89,12 @@ export function updateUser(id, patch) {
     if (patch.name !== undefined) user.name = String(patch.name).trim();
     if (patch.role !== undefined) user.role = patch.role === 'admin' ? 'admin' : 'member';
     if (patch.disabled !== undefined) user.disabled = Boolean(patch.disabled);
-    if (patch.password) user.passwordHash = hashPassword(patch.password);
+    if (patch.password) {
+      if (String(patch.password).length < 6) {
+        throw new Error('Password must be at least 6 characters.');
+      }
+      user.passwordHash = hashPassword(String(patch.password));
+    }
     if (patch.defaultModel !== undefined) user.defaultModel = patch.defaultModel || null;
     if (patch.groupId !== undefined) user.groupId = patch.groupId || null;
     if (patch.budget) {

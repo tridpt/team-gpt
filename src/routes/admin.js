@@ -64,9 +64,13 @@ adminRouter.patch('/users/:id', (req, res) => {
     return res.status(400).json({ error: 'Unknown group.' });
   }
 
-  const updated = users.updateUser(req.params.id, patch);
-  if (patch.disabled === true || patch.password) destroyUserSessions(req.params.id);
-  res.json(updated);
+  try {
+    const updated = users.updateUser(req.params.id, patch);
+    if (patch.disabled === true || patch.password) destroyUserSessions(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 adminRouter.delete('/users/:id', (req, res) => {

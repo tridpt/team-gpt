@@ -45,11 +45,17 @@ async function streamReply(req, res, userId, conv) {
     cleanup();
   });
 
+  let fullText = '';
   try {
-    const { fullText, usage: realUsage } = await chatStream(
+    const result = await chatStream(
       { model, messages: contextMessages, signal: controller.signal },
-      (delta) => send({ type: 'delta', text: delta }),
+      (delta) => {
+        fullText += delta;
+        send({ type: 'delta', text: delta });
+      },
     );
+    fullText = result.fullText || fullText;
+    const realUsage = result.usage;
 
     conversations.addMessage(userId, conv.id, { role: 'assistant', content: fullText });
 
@@ -73,7 +79,14 @@ async function streamReply(req, res, userId, conv) {
   } catch (err) {
     cleanup();
     if (controller.signal.aborted) {
-      // Client disconnected mid-stream; nothing more to send.
+      // Client disconnected mid-stream; persist any partial reply and usage.
+      if (fullText.length > 0) {
+        conversations.addMessage(userId, conv.id, { role: 'assistant', content: fullText });
+        const inputTokens = estimateMessagesTokens(contextMessages);
+        const outputTokens = estimateTokens(fullText);
+        const costUsd = computeCost(model, inputTokens, outputTokens);
+        usage.record(userId, { inputTokens, outputTokens, costUsd });
+      }
       return res.end();
     }
     const message = err instanceof GatewayError ? err.message : 'Failed to generate a reply.';

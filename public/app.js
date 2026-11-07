@@ -735,9 +735,9 @@ $('#input').addEventListener('input', (e) => autoGrow(e.target));
 const MAX_ATTACH_BYTES = 128 * 1024; // 128 KB per file
 const MAX_ATTACHMENTS = 5;
 
-$('#attach-btn').addEventListener('click', () => $('#attach-input').click());
+$('#attach-btn').addEventListener('click', () => $('#file-input').click());
 
-$('#attach-input').addEventListener('change', async (e) => {
+$('#file-input').addEventListener('change', async (e) => {
   const picked = [...e.target.files];
   e.target.value = ''; // allow re-picking the same file
   for (const file of picked) {
